@@ -26,7 +26,7 @@ create table if not exists vuln_alias(
 , vuln_id text not null -- ID of the vulnerability being aliased.
 , alias_id text not null -- ID of the aliasing vulnerability.
 , created_at integer not null default (unixepoch()) -- When the record was created in the database.
-, updated_at integer -- When the record was updated in the database.
+, deleted_at integer -- When the record was deleted in the database (i.e. no longer reported by the source).
 , primary key(source_name, vuln_id, alias_id)
 , foreign key(source_name) references source(name)
 , foreign key(vuln_id) references vuln(id)
@@ -41,6 +41,7 @@ create table if not exists vuln_data(
 , source_created_at integer -- When the record was created in the source.
 , source_published_at integer -- When the record was published by the source.
 , source_updated_at integer -- When the record was updated in the source.
+, source_rejected_at integer -- When the record was rejected in the source.
 , created_at integer not null default (unixepoch()) -- When the record was created in the database.
 , updated_at integer -- When the record was updated in the database.
 , primary key(source_name, vuln_id)
