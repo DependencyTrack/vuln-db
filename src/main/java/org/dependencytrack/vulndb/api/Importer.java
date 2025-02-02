@@ -1,13 +1,11 @@
 package org.dependencytrack.vulndb.api;
 
-import java.io.Closeable;
+public interface Importer {
 
-public interface Importer extends Closeable {
+    Source source();
+
+    void init(final Database database);
 
     void runImport() throws Exception;
-
-    @Override
-    default void close() {
-    }
 
 }

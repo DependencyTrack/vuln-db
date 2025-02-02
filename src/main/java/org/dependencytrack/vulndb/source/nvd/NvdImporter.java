@@ -19,6 +19,7 @@ import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.api.MatchingCriteria;
 import org.dependencytrack.vulndb.api.Rating;
 import org.dependencytrack.vulndb.api.Reference;
+import org.dependencytrack.vulndb.api.Source;
 import org.dependencytrack.vulndb.api.Vulnerability;
 import org.metaeffekt.core.security.cvss.CvssVector;
 import org.slf4j.Logger;
@@ -48,13 +49,19 @@ import java.util.stream.Stream;
 import static io.github.jeremylong.openvulnerability.client.nvd.NvdCveClientBuilder.aNvdCveApi;
 import static java.util.Comparator.comparingInt;
 
-final class NvdImporter implements Importer {
+public final class NvdImporter implements Importer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NvdImporter.class);
 
-    private final Database database;
+    private Database database;
 
-    public NvdImporter(final Database database) {
+    @Override
+    public Source source() {
+        return new Source("NVD", null, "https://nvd.nist.gov/");
+    }
+
+    @Override
+    public void init(final Database database) {
         this.database = database;
     }
 

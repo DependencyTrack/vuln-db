@@ -1,0 +1,3 @@
+org.dependencytrack.vulndb.source.github.GitHubImporter
+org.dependencytrack.vulndb.source.nvd.NvdImporter
+org.dependencytrack.vulndb.source.osv.OsvImporter

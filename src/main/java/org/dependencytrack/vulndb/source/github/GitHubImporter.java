@@ -19,6 +19,7 @@ import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.api.MatchingCriteria;
 import org.dependencytrack.vulndb.api.Rating;
 import org.dependencytrack.vulndb.api.Reference;
+import org.dependencytrack.vulndb.api.Source;
 import org.dependencytrack.vulndb.api.Vulnerability;
 import org.metaeffekt.core.security.cvss.CvssVector;
 import org.slf4j.Logger;
@@ -40,13 +41,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.github.packageurl.PackageURLBuilder.aPackageURL;
 import static io.github.jeremylong.openvulnerability.client.ghsa.GitHubSecurityAdvisoryClientBuilder.aGitHubSecurityAdvisoryClient;
 
-final class GitHubImporter implements Importer {
+public final class GitHubImporter implements Importer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GitHubImporter.class);
 
-    private final Database database;
+    private Database database;
 
-    GitHubImporter(final Database database) {
+    @Override
+    public Source source() {
+        return new Source("GitHub", "CC-BY-4.0", "https://github.com/advisories");
+    }
+
+    @Override
+    public void init(final Database database) {
         this.database = database;
     }
 

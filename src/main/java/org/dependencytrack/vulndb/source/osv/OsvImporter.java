@@ -9,6 +9,7 @@ import io.github.nscuro.versatile.VersUtils;
 import org.dependencytrack.vulndb.api.Database;
 import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.api.MatchingCriteria;
+import org.dependencytrack.vulndb.api.Source;
 import org.dependencytrack.vulndb.api.Vulnerability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,7 @@ import java.util.zip.ZipFile;
 
 import static java.util.function.Predicate.not;
 
-final class OsvImporter implements Importer {
+public final class OsvImporter implements Importer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OsvImporter.class);
     private static final Set<String> ENABLED_ECOSYSTEMS = Set.of(
@@ -56,11 +57,17 @@ final class OsvImporter implements Importer {
             "npm",
             "openSUSE");
 
-    private final Database database;
-    private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
+    private Database database;
+    private HttpClient httpClient;
+    private ObjectMapper objectMapper;
 
-    OsvImporter(final Database database) {
+    @Override
+    public Source source() {
+        return new Source("OSV", "", "https://osv.dev/");
+    }
+
+    @Override
+    public void init(final Database database) {
         this.database = database;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper()
