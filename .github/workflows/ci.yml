@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+permissions: { }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+    - name: Set up Java
+      uses: actions/setup-java@b36c23c0d998641eff861008f374ee103c25ac73 # v4
+      with:
+        java-version: "21"
+        distribution: "temurin"
+        cache: "maven"
+    - name: Test
+      run: mvn -B --no-transfer-progress clean verify
+
+  publish-snapshot:
+    name: Build Snapshot
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    timeout: 5
+    permissions:
+      packages: write # Required to push images to ghcr.io
+    needs:
+    - test
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+    - name: Set up Java
+      uses: actions/setup-java@b36c23c0d998641eff861008f374ee103c25ac73 # v4
+      with:
+        java-version: "21"
+        distribution: "temurin"
+        cache: "maven"
+    - name: Build
+      run: mvn -B --no-transfer-progress clean package -DskipTests
+    - name: Build and Push Container Image
+      uses: docker/build-push-action@v6.12.0
+      with:
+        tags: ghcr.io/${{ github.repository }}:snapshot
+        platforms: linux/amd64,linux/arm64
+        push: true
+        context: .
+        file: src/main/docker/Dockerfile
