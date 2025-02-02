@@ -71,6 +71,9 @@ public final class GitHubImporter implements Importer {
                 final List<Vulnerability> vulns = advisories.stream()
                         .map(this::convert)
                         .toList();
+                if (vulns.isEmpty()) {
+                    break;
+                }
 
                 database.storeVulnerabilities(vulns);
                 database.putSourceMetadata(

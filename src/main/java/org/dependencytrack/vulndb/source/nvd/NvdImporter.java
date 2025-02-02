@@ -80,6 +80,9 @@ public final class NvdImporter implements Importer {
                         .map(DefCveItem::getCve)
                         .map(this::convert)
                         .toList();
+                if (vulns.isEmpty()) {
+                    break;
+                }
 
                 database.storeVulnerabilities(vulns);
                 advisoriesImported.addAndGet(vulns.size());
