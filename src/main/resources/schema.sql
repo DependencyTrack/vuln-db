@@ -71,7 +71,7 @@ create table if not exists vuln_reference(
 , vuln_id text not null -- ID of the vulnerability the references are for.
 , url text not null -- URL of the reference.
 , name text -- Human friendly name of the reference.
-, primary key(source_name, vuln_id, name)
+, primary key(source_name, vuln_id, url)
 , foreign key(source_name) references source(name)
 , foreign key(vuln_id) references vuln(id)
 );

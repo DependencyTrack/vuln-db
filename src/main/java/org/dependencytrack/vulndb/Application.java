@@ -10,7 +10,8 @@ import java.util.concurrent.Callable;
         version = "1.0.0-SNAPSHOT",
         mixinStandardHelpOptions = true,
         subcommands = {
-                ImportCommand.class})
+                ImportCommand.class,
+                MergeCommand.class})
 public class Application implements Callable<Integer> {
 
     public static void main(final String[] args) {
