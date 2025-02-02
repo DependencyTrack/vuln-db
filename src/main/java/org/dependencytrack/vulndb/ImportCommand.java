@@ -4,7 +4,7 @@ import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.store.DatabaseImpl;
 import org.slf4j.MDC;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
 import java.util.ArrayList;
 import java.util.ServiceLoader;
@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 @Command(name = "import")
 public class ImportCommand implements Callable<Integer> {
 
-    @Option(names = "-source", description = "Sources to import data from")
+    @Parameters(description = "Sources to import data from")
     Set<String> sources;
 
     @Override

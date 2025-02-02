@@ -96,6 +96,11 @@ public final class NvdImporter implements Importer {
     private NvdCveClient createApiClient() {
         final NvdCveClientBuilder clientBuilder = aNvdCveApi();
 
+        final String apiToken = System.getenv("NVD_TOKEN");
+        if (apiToken != null) {
+            clientBuilder.withApiKey(apiToken);
+        }
+
         Optional.ofNullable(database.getSourceMetadata().get("last_modified_epoch_seconds"))
                 .map(Long::parseLong)
                 .map(Instant::ofEpochSecond)

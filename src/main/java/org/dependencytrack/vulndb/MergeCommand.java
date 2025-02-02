@@ -166,6 +166,9 @@ public class MergeCommand implements Runnable {
                         """);
             }
         }
+
+        // Force a vacuum to ensure the final database is stored as efficiently as possible.
+        jdbi.useHandle(handle -> handle.execute("VACUUM"));
     }
 
     private static void createSchema(final Handle handle) {
