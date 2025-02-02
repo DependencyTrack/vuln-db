@@ -4,10 +4,10 @@ import java.io.Closeable;
 
 public interface Importer extends Closeable {
 
-    void runImport();
+    void runImport() throws Exception;
 
     @Override
     default void close() {
     }
-    
+
 }

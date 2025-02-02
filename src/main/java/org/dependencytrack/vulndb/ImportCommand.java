@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
 @Command(name = "import")
 public class ImportCommand implements Callable<Integer> {
 
-    @Option(names = "-sources", description = "Sources to import data from")
+    @Option(names = "-source", description = "Sources to import data from")
     Set<String> sources;
 
     @Override
@@ -60,6 +60,9 @@ public class ImportCommand implements Callable<Integer> {
             try (final Importer importer = importerFactory.createImporter();
                  var ignoredMdcSource = MDC.putCloseable("source", importerFactory.source().name())) {
                 importer.runImport();
+            } catch (Exception e) {
+                throw new RuntimeException("Importer for source %s failed".formatted(
+                        importerFactory.source().name()), e);
             }
         }
 

@@ -9,9 +9,9 @@ Refer to https://github.com/DependencyTrack/dependency-track/issues/4122 for det
 ## Usage
 
 ```shell
-mvn clean package -DskipTests
-export GH_TOKEN='<your_github_token>'
-java -jar ./target/vuln-db-1.0.0-SNAPSHOT.jar
+mvn compile exec:java \
+  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
+  -Dexec.args='import -source NVD -source OSV'
 ```
 
 > [!NOTE]
