@@ -35,7 +35,7 @@ jobs:
     name: Build Snapshot
     if: ${{ github.ref_name == 'main' }}
     runs-on: ubuntu-latest
-    timeout: 5
+    timeout-minutes: 5
     permissions:
       packages: write # Required to push images to ghcr.io
     needs:
