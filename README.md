@@ -72,21 +72,17 @@ To find the aliases of all CVEs, and which source reported them:
 
 ```sql
 with cve_aliases as(
-  select vuln.id as vuln_id
-       , vuln_alias.alias_id as alias_id
-       , vuln_alias.source_name as alias_source
-    from vuln
-   inner join vuln_alias
-      on vuln_alias.vuln_id = vuln.id
-   where vuln.id like 'CVE-%'
+  select vuln_id
+       , alias_id
+       , source_name
+    from vuln_alias
+   where vuln_id like 'CVE-%'
    union
-  select vuln.id as vuln_id
-       , vuln_alias.vuln_id as alias_id
-       , vuln_alias.source_name as alias_source
-    from vuln
-   inner join vuln_alias
-      on vuln_alias.alias_id = vuln.id
-   where vuln.id like 'CVE-%'
+  select alias_id as vuln_id
+       , vuln_id as alias_id
+       , source_name
+    from vuln_alias
+   where alias_id like 'CVE-%'
 )
 select *
   from cve_aliases
@@ -96,13 +92,13 @@ select *
 
 Example output:
 
-| vuln\_id       | alias\_id           | alias\_source |
-|:---------------|:--------------------|:--------------|
-| CVE-2025-24891 | GHSA-24f2-fv38-3274 | OSV           |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | GitHub        |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | OSV           |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | GitHub        |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | OSV           |
+| vuln\_id       | alias\_id           | source\_name |
+|:---------------|:--------------------|:-------------|
+| CVE-2025-24891 | GHSA-24f2-fv38-3274 | OSV          |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | GitHub       |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | OSV          |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | GitHub       |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | OSV          |
 
 This data could be used to calculate confidences for alias relationships,
 i.e. the more sources report it the higher the confidence.
