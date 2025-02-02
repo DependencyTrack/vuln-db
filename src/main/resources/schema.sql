@@ -93,7 +93,6 @@ create table if not exists matching_criteria(
 , additional_criteria_type text -- Discriminator for the type in additional_criteria.
 , additional_criteria blob -- Additional criteria such as symbols, call stacks.
 , created_at integer not null default (unixepoch()) -- When the record was created in the database.
-, updated_at integer -- When the record was updated in the database.
 , foreign key(source_name) references source(name)
 , foreign key(vuln_id) references vuln(id)
 -- CPE matching is case-insensitive. Ensure CPE portions are stored in lowercase.
@@ -103,6 +102,10 @@ create table if not exists matching_criteria(
 -- When additional criteria is provided, a type discriminator must be set.
 , check(case when additional_criteria is not null then additional_criteria_type is not null end)
 );
+
+-- TODO: Store additional criteria in a separate table?
+--  * The same add. criteria could be referenced multiple times (wastes storage)
+--  * Can there be multiple add. criteria of different types for one criteria record?
 
 create index if not exists matching_criteria_source_name_vuln_id_idx
     on matching_criteria(source_name, vuln_id);

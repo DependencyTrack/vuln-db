@@ -20,7 +20,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -151,7 +150,7 @@ public final class DatabaseImpl implements Database, Closeable {
         final var dataRecordById = new HashMap<String, VulnerabilityDataRecord>(vulns.size());
         final var ratingRecordByKey = new HashMap<RatingKey, VulnerabilityRatingRecord>(vulns.size());
         final var referenceRecordByKey = new HashMap<ReferenceKey, VulnerabilityReferenceRecord>(vulns.size());
-        final var matchingCriteriaRecordsByVulnId = new HashMap<String, List<MatchingCriteriaRecord>>();
+        final var matchingCriteriaRecordByKey = new HashMap<MatchingCriteriaKey, MatchingCriteriaRecord>();
 
         for (final Vulnerability vuln : vulns) {
             vulnIds.add(vuln.id());
@@ -180,9 +179,8 @@ public final class DatabaseImpl implements Database, Closeable {
 
             if (vuln.matchingCriteria() != null) {
                 for (final MatchingCriteria matchingCriteria : vuln.matchingCriteria()) {
-                    matchingCriteriaRecordsByVulnId
-                            .computeIfAbsent(vuln.id(), ignored -> new ArrayList<>())
-                            .add(MatchingCriteriaRecord.of(source, vuln.id(), matchingCriteria));
+                    final var record = MatchingCriteriaRecord.of(source, vuln.id(), matchingCriteria);
+                    matchingCriteriaRecordByKey.put(MatchingCriteriaKey.of(record), record);
                 }
             }
         }
@@ -196,7 +194,7 @@ public final class DatabaseImpl implements Database, Closeable {
                     getRatingRecords(handle, vulnIds);
             final Map<ReferenceKey, VulnerabilityReferenceRecord> existingReferenceRecordByKey =
                     getReferenceRecords(handle, vulnIds);
-            final Map<String, List<MatchingCriteriaRecord>> existingMatchingCriteriaRecordsByVulnId =
+            final Map<MatchingCriteriaKey, MatchingCriteriaRecord> existingMatchingCriteriaRecordByKey =
                     getMatchingCriteriaRecords(handle, vulnIds);
 
             for (final String vulnId : vulnIds) {
@@ -237,16 +235,6 @@ public final class DatabaseImpl implements Database, Closeable {
                         updateDataRecord(handle, dataRecord);
                     } else {
                         LOGGER.debug("Data for {} has not changed", vulnId);
-                    }
-                }
-
-                final List<MatchingCriteriaRecord> matchingCriteriaRecords = matchingCriteriaRecordsByVulnId.get(vulnId);
-                final List<MatchingCriteriaRecord> existingMatchingCriteriaRecords = existingMatchingCriteriaRecordsByVulnId.get(vulnId);
-                if (existingMatchingCriteriaRecords == null || existingMatchingCriteriaRecords.isEmpty()) {
-                    if (matchingCriteriaRecords != null) {
-                        for (final MatchingCriteriaRecord matchingCriteriaRecord : matchingCriteriaRecords) {
-                            createMatchingCriteriaRecord(handle, matchingCriteriaRecord);
-                        }
                     }
                 }
             }
@@ -300,6 +288,27 @@ public final class DatabaseImpl implements Database, Closeable {
                     createReferenceRecord(handle, referenceRecord);
                 } else {
                     LOGGER.debug("Reference with {} has not changed", referenceKey);
+                }
+            }
+
+            final var matchingCriteriaKeys = new HashSet<MatchingCriteriaKey>();
+            matchingCriteriaKeys.addAll(matchingCriteriaRecordByKey.keySet());
+            matchingCriteriaKeys.addAll(existingMatchingCriteriaRecordByKey.keySet());
+
+            for (final MatchingCriteriaKey matchingCriteriaKey : matchingCriteriaKeys) {
+                final MatchingCriteriaRecord matchingCriteriaRecord =
+                        matchingCriteriaRecordByKey.get(matchingCriteriaKey);
+                final MatchingCriteriaRecord existingMatchingCriteriaRecord =
+                        existingMatchingCriteriaRecordByKey.get(matchingCriteriaKey);
+
+                if (matchingCriteriaRecord == null) {
+                    LOGGER.debug("Deleting matching criteria with {} because it is no longer reported", matchingCriteriaKey);
+                    deleteMatchingCriteriaRecord(handle, existingMatchingCriteriaRecord.id());
+                } else if (existingMatchingCriteriaRecord == null) {
+                    LOGGER.debug("Creating matching criteria with {} because it was not reported before", matchingCriteriaKey);
+                    createMatchingCriteriaRecord(handle, matchingCriteriaRecord);
+                } else {
+                    LOGGER.debug("Matching criteria with {} has not changed", matchingCriteriaKey);
                 }
             }
         });
@@ -601,7 +610,38 @@ public final class DatabaseImpl implements Database, Closeable {
                 .execute();
     }
 
-    private Map<String, List<MatchingCriteriaRecord>> getMatchingCriteriaRecords(
+    // Same fields as MatchingCriteriaRecord, but omits id, source, and created_at.
+    private record MatchingCriteriaKey(
+            String vulnId,
+            String cpe,
+            String cpePart,
+            String cpeVendor,
+            String cpeProduct,
+            String purlType,
+            String purlNamespace,
+            String purlName,
+            String versions,
+            String additionalCriteriaType,
+            byte[] additionalCriteria) {
+
+        private static MatchingCriteriaKey of(final MatchingCriteriaRecord record) {
+            return new MatchingCriteriaKey(
+                    record.vulnId(),
+                    record.cpe(),
+                    record.cpePart(),
+                    record.cpeVendor(),
+                    record.cpeProduct(),
+                    record.purlType(),
+                    record.purlNamespace(),
+                    record.purlName(),
+                    record.versions(),
+                    record.additionalCriteriaType(),
+                    record.additionalCriteria());
+        }
+
+    }
+
+    private Map<MatchingCriteriaKey, MatchingCriteriaRecord> getMatchingCriteriaRecords(
             final Handle handle,
             final Collection<String> vulnIds) {
         final Query query = handle.createQuery(/* language=SQL */ """
@@ -616,9 +656,9 @@ public final class DatabaseImpl implements Database, Closeable {
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(MatchingCriteriaRecord.class))
                 .stream()
-                .collect(Collectors.groupingBy(
-                        MatchingCriteriaRecord::vulnId,
-                        Collectors.toList()));
+                .collect(Collectors.toMap(
+                        MatchingCriteriaKey::of,
+                        Function.identity()));
     }
 
     private MatchingCriteriaRecord createMatchingCriteriaRecord(
@@ -659,6 +699,22 @@ public final class DatabaseImpl implements Database, Closeable {
                 .bindMethods(matchingCriteriaRecord)
                 .map(ConstructorMapper.of(MatchingCriteriaRecord.class))
                 .one();
+    }
+
+    private void deleteMatchingCriteriaRecord(final Handle handle, final long matchingCriteriaId) {
+        if (matchingCriteriaId <= 0) {
+            throw new IllegalArgumentException("Invalid matching criteria id: " + matchingCriteriaId);
+        }
+
+        final Update update = handle.createUpdate("""
+                delete
+                  from matching_criteria
+                 where id = :id
+                """);
+
+        update
+                .bind("id", matchingCriteriaId)
+                .execute();
     }
 
 }

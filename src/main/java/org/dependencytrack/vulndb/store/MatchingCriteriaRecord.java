@@ -19,8 +19,7 @@ public record MatchingCriteriaRecord(
         String versions,
         String additionalCriteriaType,
         byte[] additionalCriteria,
-        Instant createdAt,
-        Instant updatedAt) {
+        Instant createdAt) {
 
     static MatchingCriteriaRecord of(final Source source, final String vulnId, final MatchingCriteria matchingCriteria) {
         return new MatchingCriteriaRecord(
@@ -53,7 +52,6 @@ public record MatchingCriteriaRecord(
                         : null,
                 matchingCriteria.additionalCriteriaType(),
                 matchingCriteria.additionalCriteria(),
-                null,
                 null);
     }
 

@@ -42,6 +42,7 @@ public final class OsvImporter implements Importer {
     private static final Logger LOGGER = LoggerFactory.getLogger(OsvImporter.class);
     private static final Set<String> ENABLED_ECOSYSTEMS = Set.of(
             "Debian",
+            "Go",
             "Maven",
             "NuGet",
             "Packagist",
@@ -80,7 +81,7 @@ public final class OsvImporter implements Importer {
         LOGGER.info("Available ecosystems: {}", availableEcosystems);
 
         for (final String ecosystem : availableEcosystems) {
-            if (ENABLED_ECOSYSTEMS.contains(ecosystem)) {
+            if (!ENABLED_ECOSYSTEMS.contains(ecosystem)) {
                 LOGGER.info("Skipping ecosystem {}", ecosystem);
                 continue;
             }
@@ -162,6 +163,20 @@ public final class OsvImporter implements Importer {
                     continue;
                 }
 
+                String additionalCriteriaType = null;
+                byte[] additionalCriteria = null;
+                if ("go".equalsIgnoreCase(affected.pkg().ecosystem())
+                    && affected.ecosystemSpecific() != null
+                    && affected.ecosystemSpecific().containsKey("imports")) {
+                    final Object imports = affected.ecosystemSpecific().get("imports");
+                    try {
+                        additionalCriteria = objectMapper.writeValueAsBytes(imports);
+                        additionalCriteriaType = "go-imports"; // TODO: Define proper naming taxonomy?
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to serialize go-imports {}", imports, e);
+                    }
+                }
+
                 if (affected.ranges() != null) {
                     for (final OsvAdvisory.Range range : affected.ranges()) {
                         try {
@@ -175,8 +190,8 @@ public final class OsvImporter implements Importer {
                                     null,
                                     purl,
                                     vers,
-                                    null,
-                                    null));
+                                    additionalCriteriaType,
+                                    additionalCriteria));
                         } catch (RuntimeException e) {
                             LOGGER.warn("Failed to build vers for {}", range, e);
                         }
