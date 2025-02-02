@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-@Command(name = "compress")
+@Command(name = "compress", description = "Compress a database for distribution.")
 public class CompressCommand implements Runnable {
 
     @Parameters

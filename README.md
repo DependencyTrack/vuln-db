@@ -48,3 +48,60 @@ mvn compile exec:java \
   -Dexec.mainClass=org.dependencytrack.vulndb.Application \
   -Dexec.args='compress -output=Merged.sqlite.zstd -level 11 Merged.sqlite'
 ```
+
+### Scanning
+
+To get a rough idea of the data quality in a database, it can be leveraged
+to scan a CycloneDX Bill of Materials. The implementation of this command
+is also intended to showcase how matching logic may work.
+
+```shell
+mvn compile exec:java \
+  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
+  -Dexec.args="scan -database merged.sqlite ./bom.json"
+```
+
+## Research
+
+The database can be used to conduct research on the data across multiple sources.
+
+### Aliases
+
+To find the aliases of all CVEs, and which source reported them:
+
+```sql
+with cve_aliases as(
+  select vuln.id as vuln_id
+       , vuln_alias.alias_id as alias_id
+       , vuln_alias.source_name as alias_source
+    from vuln
+   inner join vuln_alias
+      on vuln_alias.vuln_id = vuln.id
+   where vuln.id like 'CVE-%'
+   union
+  select vuln.id as vuln_id
+       , vuln_alias.vuln_id as alias_id
+       , vuln_alias.source_name as alias_source
+    from vuln
+   inner join vuln_alias
+      on vuln_alias.alias_id = vuln.id
+   where vuln.id like 'CVE-%'
+)
+select *
+  from cve_aliases
+ order by vuln_id desc
+ limit 5
+```
+
+Example output:
+
+| vuln\_id       | alias\_id           | alias\_source |
+|:---------------|:--------------------|:--------------|
+| CVE-2025-24891 | GHSA-24f2-fv38-3274 | OSV           |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | GitHub        |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | OSV           |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | GitHub        |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | OSV           |
+
+This data could be used to calculate confidences for alias relationships,
+i.e. the more sources report it the higher the confidence.

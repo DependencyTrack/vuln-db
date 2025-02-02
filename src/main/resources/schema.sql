@@ -30,6 +30,8 @@ create table if not exists vuln_alias(
 , primary key(source_name, vuln_id, alias_id)
 , foreign key(source_name) references source(name)
 , foreign key(vuln_id) references vuln(id)
+-- Prevent a vuln ID aliasing itself.
+, check(vuln_id != alias_id)
 );
 
 -- Vulnerability data as provided by a source.

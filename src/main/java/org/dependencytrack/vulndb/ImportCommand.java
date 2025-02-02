@@ -13,7 +13,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Command(name = "import")
+@Command(name = "import", description = "Import data from upstream sources.")
 public class ImportCommand implements Callable<Integer> {
 
     @Parameters(description = "Sources to import data from")
