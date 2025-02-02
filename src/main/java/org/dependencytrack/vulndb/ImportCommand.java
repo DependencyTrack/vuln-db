@@ -4,8 +4,12 @@ import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.store.DatabaseImpl;
 import org.slf4j.MDC;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -16,6 +20,9 @@ import java.util.concurrent.Executors;
 @Command(name = "import", description = "Import data from upstream sources.")
 public class ImportCommand implements Callable<Integer> {
 
+    @Option(names = {"--workspace", "-w"})
+    Path workspacePath;
+
     @Parameters(description = "Sources to import data from")
     Set<String> sources;
 
@@ -25,13 +32,24 @@ public class ImportCommand implements Callable<Integer> {
             throw new IllegalArgumentException("No sources specified");
         }
 
+        if (workspacePath == null) {
+            workspacePath = Paths.get("");
+        }
+        workspacePath = workspacePath.normalize().toAbsolutePath();
+        if (!Files.exists(workspacePath)) {
+            throw new IllegalArgumentException("Workspace directory %s does not exist".formatted(workspacePath));
+        }
+        if (!Files.isDirectory(workspacePath)) {
+            throw new IllegalArgumentException("Workspace path %s is not a directory".formatted(workspacePath));
+        }
+
         final var importTasks = new ArrayList<ImportTask>();
         for (final var importer : ServiceLoader.load(Importer.class)) {
             if (!sources.contains(importer.source().name())) {
                 continue;
             }
 
-            final var database = DatabaseImpl.forSource(importer.source());
+            final var database = DatabaseImpl.forSource(workspacePath, importer.source());
             importer.init(database);
             importTasks.add(new ImportTask(importer));
         }

@@ -16,10 +16,10 @@ public class CompressCommand implements Runnable {
     @Parameters
     private Path inputFilePath;
 
-    @Option(names = "-output")
+    @Option(names = {"-o", "--output"})
     private Path outputFilePath;
 
-    @Option(names = "-level", defaultValue = "5")
+    @Option(names = {"-l", "--level"}, defaultValue = "5")
     private int compressionLevel;
 
     @Override

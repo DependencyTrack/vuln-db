@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,9 +45,11 @@ public final class DatabaseImpl implements Database, Closeable {
         this.source = source;
     }
 
-    public static DatabaseImpl forSource(final Source source) {
+    public static DatabaseImpl forSource(final Path workspacePath, final Source source) {
+        final Path databaseFilePath = workspacePath.resolve("%s.sqlite".formatted(source.name()));
+
         final var jdbi = Jdbi
-                .create("jdbc:sqlite:%s.sqlite".formatted(source.name()))
+                .create("jdbc:sqlite:" + databaseFilePath)
                 .installPlugin(new Jackson2Plugin())
                 .installPlugin(new SQLitePlugin());
 

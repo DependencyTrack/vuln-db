@@ -8,21 +8,16 @@ Refer to https://github.com/DependencyTrack/dependency-track/issues/4122 for det
 
 ## Usage
 
-> [!NOTE]
-> *vuln-db* requires Java >= 21.
-
 ### Importing
 
 ```shell
-# Required for GitHub
-export GH_TOKEN='<your_github_token>'
-
-# Optional for NVD. Import will be slower without it.
-export NVD_TOKEN='<your_nvd_token>'
-
-mvn compile exec:java \
-  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
-  -Dexec.args='import GitHub NVD OSV'
+docker run -it --rm \
+  -e 'GH_TOKEN=<your_github_token>' \
+  -e 'NVD_TOKEN=<your_nvd_token>' \
+  -v "$(pwd):/workspace" \
+  -w '/workspace' \
+  ghcr.io/nscuro/vuln-db:snapshot \
+  import GitHub NVD OSV
 ```
 
 This will populate the following database files in parallel:
@@ -34,9 +29,11 @@ This will populate the following database files in parallel:
 ### Merging
 
 ```shell
-mvn compile exec:java \
-  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
-  -Dexec.args='merge -output=Merged.sqlite GitHub.sqlite NVD.sqlite OSV.sqlite'
+docker run -it --rm \
+  -v "$(pwd):/workspace" \
+  -w '/workspace' \
+  ghcr.io/nscuro/vuln-db:snapshot \
+  merge --output=All.sqlite GitHub.sqlite NVD.sqlite OSV.sqlite
 ```
 
 ### Compressing
@@ -44,9 +41,11 @@ mvn compile exec:java \
 Databases should be compressed before distributing them, to save storage and network costs.
 
 ```shell
-mvn compile exec:java \
-  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
-  -Dexec.args='compress -output=Merged.sqlite.zstd -level 11 Merged.sqlite'
+docker run -it --rm \
+  -v "$(pwd):/workspace" \
+  -w '/workspace' \
+  ghcr.io/nscuro/vuln-db:snapshot \
+  compress --output=All.sqlite.zstd --level=11 Merged.sqlite
 ```
 
 ### Scanning
@@ -56,9 +55,11 @@ to scan a CycloneDX Bill of Materials. The implementation of this command
 is also intended to showcase how matching logic may work.
 
 ```shell
-mvn compile exec:java \
-  -Dexec.mainClass=org.dependencytrack.vulndb.Application \
-  -Dexec.args="scan -database merged.sqlite ./bom.json"
+docker run -it --rm \
+  -v "$(pwd):/workspace" \
+  -w '/workspace' \
+  ghcr.io/nscuro/vuln-db:snapshot \
+  scan --database=All.sqlite bom.json
 ```
 
 ## Research

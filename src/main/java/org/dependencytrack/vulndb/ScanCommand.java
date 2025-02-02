@@ -32,7 +32,7 @@ import java.util.concurrent.Callable;
 @Command(name = "scan", description = "Test a database by scanning BOMs.")
 public class ScanCommand implements Callable<Integer> {
 
-    @Option(names = "-database")
+    @Option(names = {"-d", "--database"})
     Path databaseFilePath;
 
     @Parameters

@@ -14,7 +14,7 @@ import java.util.List;
 @Command(name = "merge", description = "Merge multiple databases into one.")
 public class MergeCommand implements Runnable {
 
-    @Option(names = "-output", defaultValue = "merged.sqlite")
+    @Option(names = {"-o", "--output"}, defaultValue = "merged.sqlite")
     private String outputFilePath;
 
     @Parameters
