@@ -57,7 +57,7 @@ public final class NvdImporter implements Importer {
 
     @Override
     public Source source() {
-        return new Source("NVD", null, "https://nvd.nist.gov/");
+        return new Source("nvd", "National Vulnerability Database (NVD)", null, "https://nvd.nist.gov/");
     }
 
     @Override

@@ -86,11 +86,12 @@ public final class DatabaseImpl implements Database, Closeable {
     private void ensureSourceExists(final Source source) {
         jdbi.useTransaction(handle -> {
             final Update update = handle.createUpdate("""
-                    insert into source(name, license, url)
-                    values (:name, :license, :url)
+                    insert into source(name, display_name, license, url)
+                    values (:name, :displayName, :license, :url)
                     on conflict (name) do update
-                    set license = :license
-                      , url = :url
+                    set display_name = excluded.display_name
+                      , license = excluded.license
+                      , url = excluded.url
                     """);
 
             update.bindMethods(source).execute();

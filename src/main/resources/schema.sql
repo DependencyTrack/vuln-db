@@ -2,9 +2,10 @@ pragma journal_mode = wal;
 pragma synchronous = normal;
 
 create table if not exists source(
-  name text not null primary key
-, license text
-, url text
+  name text not null primary key -- Uniquely identifying name of the source.
+, display_name text not null -- Human-friendly display name of the source.
+, license text -- License of the source, if any.
+, url text -- URL of the source, if any.
 );
 
 create table if not exists source_metadata(

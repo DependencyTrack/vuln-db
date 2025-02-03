@@ -64,7 +64,7 @@ public final class OsvImporter implements Importer {
 
     @Override
     public Source source() {
-        return new Source("OSV", "", "https://osv.dev/");
+        return new Source("osv", "Open Source Vulnerabilities (OSV)", null, "https://osv.dev/");
     }
 
     @Override

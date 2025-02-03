@@ -12,19 +12,19 @@ Refer to https://github.com/DependencyTrack/dependency-track/issues/4122 for det
 
 ```shell
 docker run -it --rm \
-  -e 'GH_TOKEN=<your_github_token>' \
+  -e 'GITHUB_TOKEN=<your_github_token>' \
   -e 'NVD_TOKEN=<your_nvd_token>' \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/nscuro/vuln-db:snapshot \
-  import GitHub NVD OSV
+  import github nvd osv
 ```
 
 This will populate the following database files in parallel:
 
-* `GitHub.sqlite`
-* `NVD.sqlite`
-* `OSV.sqlite`
+* `github.sqlite`
+* `nvd.sqlite`
+* `osv.sqlite`
 
 ### Merging
 
@@ -33,7 +33,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/nscuro/vuln-db:snapshot \
-  merge --output=All.sqlite GitHub.sqlite NVD.sqlite OSV.sqlite
+  merge --output=all.sqlite github.sqlite nvd.sqlite osv.sqlite
 ```
 
 ### Compressing
@@ -45,7 +45,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/nscuro/vuln-db:snapshot \
-  compress --output=All.sqlite.zstd --level=11 Merged.sqlite
+  compress --output=all.sqlite.zstd --level=11 all.sqlite
 ```
 
 ### Scanning
@@ -59,7 +59,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/nscuro/vuln-db:snapshot \
-  scan --database=All.sqlite bom.json
+  scan --database=all.sqlite bom.json
 ```
 
 ## Research
@@ -94,11 +94,11 @@ Example output:
 
 | vuln\_id       | alias\_id           | source\_name |
 |:---------------|:--------------------|:-------------|
-| CVE-2025-24891 | GHSA-24f2-fv38-3274 | OSV          |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | GitHub       |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | OSV          |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | GitHub       |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | OSV          |
+| CVE-2025-24891 | GHSA-24f2-fv38-3274 | osv          |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | github       |
+| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | osv          |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | github       |
+| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | osv          |
 
 This data could be used to calculate confidences for alias relationships,
 i.e. the more sources report it the higher the confidence.
@@ -151,13 +151,13 @@ Example output:
 
 | vuln\_id       | alias\_id           | source\_name | source\_rejected\_at |
 |:---------------|:--------------------|:-------------|:---------------------|
-| CVE-2018-1103  | null                | OSV          | 1715751224000        |
-| CVE-2018-1103  | GHSA-w55j-f7vx-6q37 | GitHub       | null                 |
-| CVE-2018-1103  | GHSA-w55j-f7vx-6q37 | OSV          | null                 |
-| CVE-2018-1103  | GO-2020-0026        | OSV          | null                 |
-| CVE-2018-11087 | null                | OSV          | 1715751224000        |
-| CVE-2018-11087 | GHSA-w4g2-9hj6-5472 | GitHub       | null                 |
-| CVE-2018-11087 | GHSA-w4g2-9hj6-5472 | OSV          | null                 |
+| CVE-2018-1103  | null                | osv          | 1715751224000        |
+| CVE-2018-1103  | GHSA-w55j-f7vx-6q37 | github       | null                 |
+| CVE-2018-1103  | GHSA-w55j-f7vx-6q37 | osv          | null                 |
+| CVE-2018-1103  | GO-2020-0026        | osv          | null                 |
+| CVE-2018-11087 | null                | osv          | 1715751224000        |
+| CVE-2018-11087 | GHSA-w4g2-9hj6-5472 | github       | null                 |
+| CVE-2018-11087 | GHSA-w4g2-9hj6-5472 | osv          | null                 |
 
-In the above output `CVE-2018-11087` and `CVE-2018-11087` are both declared as withdrawn
+In the above output `CVE-2018-1103` and `CVE-2018-11087` are both declared as withdrawn
 by OSV, but none of their respective aliases are, even if they originate from the same source (OSV).

@@ -49,7 +49,7 @@ public final class GitHubImporter implements Importer {
 
     @Override
     public Source source() {
-        return new Source("GitHub", "CC-BY-4.0", "https://github.com/advisories");
+        return new Source("github", "GitHub Advisory Database", "CC-BY-4.0", "https://github.com/advisories");
     }
 
     @Override
@@ -93,7 +93,7 @@ public final class GitHubImporter implements Importer {
 
         final GitHubSecurityAdvisoryClientBuilder clientBuilder = aGitHubSecurityAdvisoryClient()
                 .withHttpClientSupplier(httpClientBuilder::build)
-                .withApiKey(System.getenv("GH_TOKEN"));
+                .withApiKey(System.getenv("GITHUB_TOKEN"));
 
         Optional.ofNullable(database.getSourceMetadata().get("last_modified_epoch_seconds"))
                 .map(Long::parseLong)
