@@ -1,0 +1,59 @@
+name: Update Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      cli-version:
+        type: string
+        required: true
+        default: snapshot
+      database-version:
+        type: string
+        required: true
+        default: snapshot
+
+permissions: { }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.database-version }}
+  cancel-in-progress: false
+
+jobs:
+  update-source-databases:
+    name: Update source database
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        source:
+        - github
+      fail-fast: false
+    steps:
+    - name: Setup ORAS
+      uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # tag=v1.2.2
+    - name: Login to GitHub Container Registry
+      run: |
+        echo '${{ secrets.GITHUB_TOKEN }}' | oras login ghcr.io -u github --password-stdin
+    - name: Pull latest database
+      run: |
+        oras pull 'ghcr.io/${{ github.repository }}/source/${{ matrix.source }}:${{ inputs.database-version }}' \
+          && zstd --decompress --rm '${{ matrix.source }}.sqlite.zstd' -o '${{ matrix.source }}.sqlite' \
+          || echo 'No existing database found for source ${{ matrix.source }} and version ${{ inputs.database-version }}'
+    - name: Update database
+      run: |
+        docker run -it --rm \
+          -e 'GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}' \
+          -v "$(pwd):/workspace" \
+          -w '/workspace' \
+          ghcr.io/${{ github.repository }}:${{ inputs.cli-version }} \
+          import ${{ matrix.source }}
+    - name: Compress database
+      run: |
+        zstd -11 --rm '${{ matrix.source }}.sqlite' -o '${{ matrix.source }}.sqlite.zstd'
+    - name: Push database
+      run: |
+        oras push --verbose \
+          'ghcr.io/${{ github.repository }}/source/${{ matrix.source }}:${{ inputs.database-version }}' \
+          '${{ matrix.source }}.sqlite.zstd'
