@@ -7,10 +7,15 @@ on:
         type: string
         required: true
         default: snapshot
+        description: Version of the vuln-db CLI to use.
       database-version:
         type: string
         required: true
         default: snapshot
+        description: Database version to build.
+      ignore-existing:
+        type: boolean
+        description: Whether to ignore existing builds of this database version.
 
 permissions: { }
 
