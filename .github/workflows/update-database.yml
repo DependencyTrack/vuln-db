@@ -59,7 +59,7 @@ jobs:
           import ${{ matrix.source }}
     - name: Compress database
       run: |
-        zstd -11 --rm '${{ matrix.source }}.sqlite'
+        zstd -16 --rm '${{ matrix.source }}.sqlite'
     - name: Push database
       run: |
         oras push --verbose \
@@ -97,7 +97,7 @@ jobs:
           merge --output=all.sqlite *.sqlite
     - name: Compress merged database
       run: |
-        zstd -11 --rm 'all.sqlite'
+        zstd -16 --rm 'all.sqlite'
     - name: Push database
       run: |
         oras push --verbose \
