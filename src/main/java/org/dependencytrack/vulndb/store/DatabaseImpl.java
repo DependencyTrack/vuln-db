@@ -607,7 +607,8 @@ public final class DatabaseImpl implements Database, Closeable {
 
         update
                 .bindMethods("source", source)
-                .bindMethods(referenceKey)
+                .bind("vulnId", referenceKey.vulnId())
+                .bind("url", referenceKey.url())
                 .execute();
     }
 
