@@ -79,6 +79,7 @@ public final class OsvImporter implements Importer {
             LOGGER.info("Downloading archive of ecosystem {}", ecosystem);
             final Path ecosystemArchivePath = downloadEcosystemArchive(ecosystem);
 
+            LOGGER.info("Processing advisories of ecosystem {}", ecosystem);
             extractEcosystemArchive(ecosystemArchivePath, this::processAdvisory);
         }
     }

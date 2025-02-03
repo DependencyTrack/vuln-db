@@ -67,11 +67,11 @@ public final class NvdImporter implements Importer {
 
     @Override
     public void runImport() {
-        final var advisoriesImported = new AtomicInteger();
+        final var vulnsImported = new AtomicInteger();
         try (final ScheduledExecutorService statusExecutor = Executors.newSingleThreadScheduledExecutor();
              final var apiClient = createApiClient()) {
             statusExecutor.scheduleAtFixedRate(
-                    () -> LOGGER.info("Mirrored {}/{}", advisoriesImported, apiClient.getTotalAvailable()),
+                    () -> LOGGER.info("Imported {}/{} vulnerabilities", vulnsImported, apiClient.getTotalAvailable()),
                     1, 3, TimeUnit.SECONDS);
 
             while (apiClient.hasNext()) {
@@ -85,7 +85,7 @@ public final class NvdImporter implements Importer {
                 }
 
                 database.storeVulnerabilities(vulns);
-                advisoriesImported.addAndGet(vulns.size());
+                vulnsImported.addAndGet(vulns.size());
             }
 
             // Unfortunately batches of CVEs are arriving out-of-order so we can only
