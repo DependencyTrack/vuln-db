@@ -32,11 +32,14 @@ public class MergeCommand implements Runnable {
                 handle.execute("attach database ? as other", inputFilePath);
 
                 handle.execute("""
-                        insert into main.source(name, license, url)
+                        insert into main.source(name, display_name, license, url)
                         select *
                           from other.source
                          where 1 = 1
-                        on conflict(name) do nothing
+                        on conflict(name) do update
+                        set display_name = excluded.display_name
+                          , license = excluded.license
+                          , url = excluded.url
                         """);
                 handle.execute("""
                         insert into main.source_metadata(source_name, key, value, created_at, updated_at)
@@ -146,7 +149,6 @@ public class MergeCommand implements Runnable {
                         , additional_criteria_type
                         , additional_criteria
                         , created_at
-                        , updated_at
                         )
                         select source_name
                              , vuln_id
@@ -161,7 +163,6 @@ public class MergeCommand implements Runnable {
                              , additional_criteria_type
                              , additional_criteria
                              , created_at
-                             , updated_at
                           from other.matching_criteria
                         """);
             }
