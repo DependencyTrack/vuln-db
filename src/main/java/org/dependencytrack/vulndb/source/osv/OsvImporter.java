@@ -40,23 +40,13 @@ import static java.util.function.Predicate.not;
 public final class OsvImporter implements Importer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OsvImporter.class);
+
+    // TODO: Make this configurable.
     private static final Set<String> ENABLED_ECOSYSTEMS = Set.of(
             "Debian",
             "Go",
             "Maven",
-            "NuGet",
-            "Packagist",
-            "Pub",
-            "PyPI",
-            "Red Hat",
-            "Rocky Linux",
-            "RubyGems",
-            "SUSE",
-            "Ubuntu",
-            "Wolfi",
-            "crates.io",
-            "npm",
-            "openSUSE");
+            "npm");
 
     private Database database;
     private HttpClient httpClient;

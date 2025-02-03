@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         source:
-        - github
+        - osv
       fail-fast: false
     steps:
     - name: Setup ORAS
