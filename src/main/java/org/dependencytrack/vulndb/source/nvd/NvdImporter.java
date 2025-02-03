@@ -206,6 +206,22 @@ public final class NvdImporter implements Importer {
                     .toList());
         }
 
+        Instant rejectedAt = null;
+        if ("rejected".equalsIgnoreCase(cveItem.getVulnStatus())) {
+            // There's no timestamp as to *when* it was rejected.
+            // Assume zero instant as stable value.
+            rejectedAt = Instant.EPOCH;
+        }
+//        else if (cveItem.getCveTags() != null) {
+//            // TODO: Should we track rejected and disputed separately?
+//            for (final CveTag cveTag : cveItem.getCveTags()) {
+//                if (cveTag.getTags() != null && cveTag.getTags().contains(CveTag.TagType.DISPUTED)) {
+//                    rejectedAt = Instant.EPOCH;
+//                    break;
+//                }
+//            }
+//        }
+
         return new Vulnerability(
                 cveItem.getId(),
                 null,
@@ -221,7 +237,7 @@ public final class NvdImporter implements Importer {
                 cveItem.getLastModified() != null
                         ? cveItem.getLastModified().toInstant()
                         : null,
-                null);
+                rejectedAt);
     }
 
     private static String convertDescriptions(final List<LangString> descriptions) {
