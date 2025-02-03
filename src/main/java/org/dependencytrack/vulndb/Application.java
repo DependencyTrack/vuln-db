@@ -8,7 +8,6 @@ import picocli.CommandLine.Command;
         version = "1.0.0-SNAPSHOT",
         mixinStandardHelpOptions = true,
         subcommands = {
-                CompressCommand.class,
                 ImportCommand.class,
                 MergeCommand.class,
                 ScanCommand.class})

@@ -36,18 +36,6 @@ docker run -it --rm \
   merge --output=all.sqlite github.sqlite nvd.sqlite osv.sqlite
 ```
 
-### Compressing
-
-Databases should be compressed before distributing them, to save storage and network costs.
-
-```shell
-docker run -it --rm \
-  -v "$(pwd):/workspace" \
-  -w '/workspace' \
-  ghcr.io/nscuro/vuln-db:snapshot \
-  compress --output=all.sqlite.zstd --level=11 all.sqlite
-```
-
 ### Scanning
 
 To get a rough idea of the data quality in a database, it can be leveraged
