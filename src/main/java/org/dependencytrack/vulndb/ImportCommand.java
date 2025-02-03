@@ -1,7 +1,10 @@
 package org.dependencytrack.vulndb;
 
 import org.dependencytrack.vulndb.api.Importer;
+import org.dependencytrack.vulndb.api.Source;
 import org.dependencytrack.vulndb.store.DatabaseImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -11,14 +14,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Command(name = "import", description = "Import data from upstream sources.")
 public class ImportCommand implements Callable<Integer> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ImportCommand.class);
 
     @Option(names = {"--workspace", "-w"})
     Path workspacePath;
@@ -54,17 +62,29 @@ public class ImportCommand implements Callable<Integer> {
             importTasks.add(new ImportTask(importer));
         }
 
+        final var importTaskFutureBySource = new HashMap<Source, Future<?>>(importTasks.size());
         final ExecutorService executorService = Executors.newFixedThreadPool(importTasks.size());
         try (executorService) {
             for (final ImportTask importTask : importTasks) {
-                executorService.execute(importTask);
+                final Future<?> future = executorService.submit(importTask);
+                importTaskFutureBySource.put(importTask.importer.source(), future);
             }
         }
 
-        return 0;
+        int sourcesFailed = 0;
+        for (final Map.Entry<Source, Future<?>> entry : importTaskFutureBySource.entrySet()) {
+            try {
+                entry.getValue().get();
+            } catch (Exception e) {
+                LOGGER.error("Import of source {} failed", entry.getKey().name(), e);
+                sourcesFailed++;
+            }
+        }
+
+        return sourcesFailed == 0 ? 0 : 1;
     }
 
-    private static final class ImportTask implements Runnable {
+    private static final class ImportTask implements Callable<Void> {
 
         private final Importer importer;
 
@@ -73,13 +93,12 @@ public class ImportCommand implements Callable<Integer> {
         }
 
         @Override
-        public void run() {
+        public Void call() throws Exception {
             try (var ignoredMdcSource = MDC.putCloseable("source", importer.source().name())) {
                 importer.runImport();
-            } catch (Exception e) {
-                throw new RuntimeException("Importer for source %s failed".formatted(
-                        importer.source().name()), e);
             }
+
+            return null;
         }
 
     }
