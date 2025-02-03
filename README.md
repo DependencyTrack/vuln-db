@@ -6,6 +6,38 @@ Proof of concept for OWASP Dependency-Track's own, centralized vulnerability dat
 
 Refer to https://github.com/DependencyTrack/dependency-track/issues/4122 for details.
 
+## Concept
+
+```mermaid
+flowchart LR
+    A@{ shape: circle, label: "Start" }
+    B@{ shape: fork, label: "Fork" }
+    C@{ shape: fork, label: "Join" }
+    Z@{ shape: dbl-circ, label: "Stop" }
+    GH["Import GitHub"]
+    NVD["Import NVD"]
+    OSV["Import OSV"]
+    OTH["Import ..."]
+    MR["Merge source<br/>databases"]
+    PR["Procure"]
+    EN["Enrich"]
+    style OTH stroke-dasharray: 5 5
+    style EN stroke-dasharray: 5 5
+    A --> B
+    B --> GH
+    B --> NVD
+    B --> OSV
+    B --> OTH
+    GH --> C
+    NVD --> C
+    OSV --> C
+    OTH --> C
+    C --> MR
+    MR --> PR
+    PR --> EN
+    EN --> Z
+```
+
 ## Usage
 
 ### Importing
