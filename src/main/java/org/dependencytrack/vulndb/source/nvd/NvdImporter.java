@@ -67,6 +67,9 @@ public final class NvdImporter implements Importer {
 
     @Override
     public void runImport() {
+        // https://nvd.nist.gov/developers/terms-of-use
+        LOGGER.info("This product uses the NVD API but is not endorsed or certified by the NVD.");
+
         final var vulnsImported = new AtomicInteger();
         try (final ScheduledExecutorService statusExecutor = Executors.newSingleThreadScheduledExecutor();
              final var apiClient = createApiClient()) {
@@ -237,7 +240,7 @@ public final class NvdImporter implements Importer {
             return null;
         }
 
-        return weaknesses.stream()
+        final List<Integer> cweIds = weaknesses.stream()
                 .map(Weakness::getDescription)
                 .flatMap(Collection::stream)
                 .filter(description -> "en".equalsIgnoreCase(description.getLang()))
@@ -248,6 +251,8 @@ public final class NvdImporter implements Importer {
                 .map(Integer::parseInt)
                 .distinct()
                 .toList();
+
+        return !cweIds.isEmpty() ? cweIds : null;
     }
 
     private static List<Reference> convertReferences(final List<io.github.jeremylong.openvulnerability.client.nvd.Reference> nvdReferences) {

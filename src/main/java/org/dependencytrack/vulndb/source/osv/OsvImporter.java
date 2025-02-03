@@ -9,8 +9,13 @@ import io.github.nscuro.versatile.VersUtils;
 import org.dependencytrack.vulndb.api.Database;
 import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.api.MatchingCriteria;
+import org.dependencytrack.vulndb.api.Rating;
 import org.dependencytrack.vulndb.api.Source;
 import org.dependencytrack.vulndb.api.Vulnerability;
+import org.metaeffekt.core.security.cvss.CvssVector;
+import org.metaeffekt.core.security.cvss.v2.Cvss2;
+import org.metaeffekt.core.security.cvss.v3.Cvss3;
+import org.metaeffekt.core.security.cvss.v4P0.Cvss4P0;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Set;
@@ -191,12 +197,61 @@ public final class OsvImporter implements Importer {
             }
         }
 
+        final var ratings = new ArrayList<Rating>();
+        if (advisory.severity() != null) {
+            for (final OsvAdvisory.Severity severity : advisory.severity()) {
+                if (severity.type() == null
+                    || !severity.type().toLowerCase().startsWith("cvss")) {
+                    LOGGER.warn("Unrecognized severity: {}", severity);
+                    continue;
+                }
+
+                final var vector = CvssVector.parseVector(severity.score());
+                if (vector != null) {
+                    final Rating.Method method = switch (vector) {
+                        case Cvss2 ignored -> Rating.Method.CVSSv2;
+                        case Cvss3 ignored -> Rating.Method.CVSSv3;
+                        case Cvss4P0 ignored -> Rating.Method.CVSSv4;
+                        default -> null;
+                    };
+                    if (method == null) {
+                        LOGGER.warn("Unexpected CVSS type {}", vector.getClass().getName());
+                        continue;
+                    }
+
+                    ratings.add(new Rating(
+                            Rating.Method.CVSSv3,
+                            Rating.Severity.ofCvss(vector),
+                            vector.toString(),
+                            vector.getBaseScore()));
+                } else {
+                    LOGGER.warn("Failed to parse CVSS vector {}", severity.score());
+                }
+            }
+        }
+
+        final var cwes = new ArrayList<Integer>();
+        if (advisory.databaseSpecific() != null
+            && advisory.databaseSpecific().containsKey("cwe_ids")) {
+            final Collection<String> cweIds;
+            try {
+                cweIds = (Collection<String>) advisory.databaseSpecific().get("cwe_ids");
+                cweIds.stream()
+                        .map(String::toLowerCase)
+                        .map(cweId -> cweId.replaceFirst("^cwe-", ""))
+                        .map(Integer::parseInt)
+                        .forEach(cwes::add);
+            } catch (ClassCastException e) {
+                LOGGER.warn("Unexpected format of cwe_ids: {}", advisory.databaseSpecific().get("cwe_ids"));
+            }
+        }
+
         final var vuln = new Vulnerability(
                 advisory.id(),
                 advisory.aliases(),
                 advisory.details(),
-                null,
-                null,
+                !cwes.isEmpty() ? cwes : null,
+                !ratings.isEmpty() ? ratings : null,
                 null,
                 !matchingCriteriaList.isEmpty() ? matchingCriteriaList : null,
                 null,
