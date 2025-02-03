@@ -43,7 +43,7 @@ jobs:
           || echo 'No existing database found for source ${{ matrix.source }} and version ${{ inputs.database-version }}'
     - name: Update database
       run: |
-        docker run -it --rm \
+        docker run --rm \
           -e 'GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}' \
           -v "$(pwd):/workspace" \
           -w '/workspace' \
