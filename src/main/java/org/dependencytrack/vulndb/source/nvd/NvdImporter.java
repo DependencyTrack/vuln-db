@@ -24,6 +24,7 @@ import org.dependencytrack.vulndb.api.Vulnerability;
 import org.metaeffekt.core.security.cvss.CvssVector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import us.springett.parsers.cpe.Cpe;
 import us.springett.parsers.cpe.CpeParser;
 import us.springett.parsers.cpe.exceptions.CpeParsingException;
@@ -81,7 +82,11 @@ public final class NvdImporter implements Importer {
                 final Collection<DefCveItem> defCveItems = apiClient.next();
                 final List<Vulnerability> vulns = defCveItems.stream()
                         .map(DefCveItem::getCve)
-                        .map(this::convert)
+                        .map(cveItem -> {
+                            try (var ignored = MDC.putCloseable("vulnId", cveItem.getId())) {
+                                return convert(cveItem);
+                            }
+                        })
                         .toList();
                 if (vulns.isEmpty()) {
                     break;

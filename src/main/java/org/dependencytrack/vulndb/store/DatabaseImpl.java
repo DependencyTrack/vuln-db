@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -148,10 +149,10 @@ public final class DatabaseImpl implements Database, Closeable {
     public void storeVulnerabilities(final Collection<Vulnerability> vulns) {
         final var vulnIds = new HashSet<String>();
         final var aliasesByVulnId = new HashMap<String, List<String>>();
-        final var dataRecordById = new HashMap<String, VulnerabilityDataRecord>(vulns.size());
-        final var ratingRecordByKey = new HashMap<RatingKey, VulnerabilityRatingRecord>(vulns.size());
-        final var referenceRecordByKey = new HashMap<ReferenceKey, VulnerabilityReferenceRecord>(vulns.size());
-        final var matchingCriteriaRecordByKey = new HashMap<MatchingCriteriaKey, MatchingCriteriaRecord>();
+        final var dataRecordByVulnId = new HashMap<String, VulnerabilityDataRecord>(vulns.size());
+        final var ratingRecordByIdentity = new HashMap<RatingIdentity, VulnerabilityRatingRecord>(vulns.size());
+        final var referenceRecordByIdentity = new HashMap<ReferenceIdentity, VulnerabilityReferenceRecord>(vulns.size());
+        final var matchingCriteriaRecordByIdentity = new HashMap<MatchingCriteriaIdentity, MatchingCriteriaRecord>();
 
         for (final Vulnerability vuln : vulns) {
             vulnIds.add(vuln.id());
@@ -160,20 +161,20 @@ public final class DatabaseImpl implements Database, Closeable {
                 aliasesByVulnId.put(vuln.id(), vuln.aliases());
             }
 
-            dataRecordById.put(vuln.id(), VulnerabilityDataRecord.of(source, vuln));
+            dataRecordByVulnId.put(vuln.id(), VulnerabilityDataRecord.of(source, vuln));
 
             if (vuln.ratings() != null) {
                 for (final Rating rating : vuln.ratings()) {
-                    ratingRecordByKey.put(
-                            new RatingKey(vuln.id(), rating.method().name().replace("_", ".")),
+                    ratingRecordByIdentity.put(
+                            new RatingIdentity(vuln.id(), rating.method().name().replace("_", ".")),
                             VulnerabilityRatingRecord.of(source, vuln.id(), rating));
                 }
             }
 
             if (vuln.references() != null) {
                 for (final Reference reference : vuln.references()) {
-                    referenceRecordByKey.put(
-                            new ReferenceKey(vuln.id(), reference.url()),
+                    referenceRecordByIdentity.put(
+                            new ReferenceIdentity(vuln.id(), reference.url()),
                             VulnerabilityReferenceRecord.of(source, vuln.id(), reference));
                 }
             }
@@ -181,7 +182,7 @@ public final class DatabaseImpl implements Database, Closeable {
             if (vuln.matchingCriteria() != null) {
                 for (final MatchingCriteria matchingCriteria : vuln.matchingCriteria()) {
                     final var record = MatchingCriteriaRecord.of(source, vuln.id(), matchingCriteria);
-                    matchingCriteriaRecordByKey.put(MatchingCriteriaKey.of(record), record);
+                    matchingCriteriaRecordByIdentity.put(MatchingCriteriaIdentity.of(record), record);
                 }
             }
         }
@@ -191,11 +192,11 @@ public final class DatabaseImpl implements Database, Closeable {
                     getAliases(handle, vulnIds);
             final Map<String, VulnerabilityDataRecord> existingDataRecordByVulnId =
                     getDataRecords(handle, vulnIds);
-            final Map<RatingKey, VulnerabilityRatingRecord> existingRatingRecordByKey =
+            final Map<RatingIdentity, VulnerabilityRatingRecord> existingRatingRecordByIdentity =
                     getRatingRecords(handle, vulnIds);
-            final Map<ReferenceKey, VulnerabilityReferenceRecord> existingReferenceRecordByKey =
+            final Map<ReferenceIdentity, VulnerabilityReferenceRecord> existingReferenceRecordByIdentity =
                     getReferenceRecords(handle, vulnIds);
-            final Map<MatchingCriteriaKey, MatchingCriteriaRecord> existingMatchingCriteriaRecordByKey =
+            final Map<MatchingCriteriaIdentity, MatchingCriteriaRecord> existingMatchingCriteriaRecordByIdentity =
                     getMatchingCriteriaRecords(handle, vulnIds);
 
             for (final String vulnId : vulnIds) {
@@ -210,106 +211,123 @@ public final class DatabaseImpl implements Database, Closeable {
                         .filter(not(aliases::contains))
                         .toList();
                 for (final String aliasId : aliasesToCreate) {
-                    LOGGER.debug("Creating alias {} for {} because it was not reported before", aliasId, vulnId);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating alias {}", vulnId, aliasId);
+                    }
                     createAlias(handle, vulnId, aliasId);
                 }
                 for (final String aliasId : aliasesToDelete) {
-                    LOGGER.debug("Deleting alias {} for {} because it is no longer reported", aliasId, vulnId);
+                    LOGGER.info("{}: deleting alias {} because it is no longer reported", vulnId, aliasId);
                     deleteAlias(handle, vulnId, aliasId);
                 }
 
-                final VulnerabilityDataRecord dataRecord = dataRecordById.get(vulnId);
+                final VulnerabilityDataRecord dataRecord = dataRecordByVulnId.get(vulnId);
                 final VulnerabilityDataRecord existingDataRecord = existingDataRecordByVulnId.get(vulnId);
                 if (existingDataRecord == null) {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating data {}", vulnId, dataRecord);
+                    }
                     createDataRecord(handle, dataRecord);
                 } else {
-                    boolean hasChanged = false;
-                    hasChanged |= !Objects.equals(dataRecord.description(), existingDataRecord.description());
-                    hasChanged |= !Objects.equals(dataRecord.cwes(), existingDataRecord.cwes());
-                    hasChanged |= !Objects.equals(dataRecord.sourceCreatedAt(), existingDataRecord.sourceCreatedAt());
-                    hasChanged |= !Objects.equals(dataRecord.sourcePublishedAt(), existingDataRecord.sourcePublishedAt());
-                    hasChanged |= !Objects.equals(dataRecord.sourceUpdatedAt(), existingDataRecord.sourceUpdatedAt());
-                    hasChanged |= !Objects.equals(dataRecord.sourceRejectedAt(), existingDataRecord.sourceRejectedAt());
+                    final var differ = new PropertyDiffer<>(existingDataRecord, dataRecord);
+                    differ.diff("description", VulnerabilityDataRecord::description);
+                    differ.diff("cwes", VulnerabilityDataRecord::cwes);
+                    differ.diff("sourceCreatedAt", VulnerabilityDataRecord::sourceCreatedAt);
+                    differ.diff("sourcePublishedAt", VulnerabilityDataRecord::sourcePublishedAt);
+                    differ.diff("sourceUpdatedAt", VulnerabilityDataRecord::sourceUpdatedAt);
+                    differ.diff("sourceRejectedAt", VulnerabilityDataRecord::sourceRejectedAt);
 
-                    if (hasChanged) {
-                        LOGGER.info("Updating data for {} because it changed", vulnId);
+                    if (!differ.diffs().isEmpty()) {
+                        LOGGER.info("{}: data has changed: {}", vulnId, differ.diffs());
                         updateDataRecord(handle, dataRecord);
                     } else {
-                        LOGGER.debug("Data for {} has not changed", vulnId);
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug("{}: data has not changed", vulnId);
+                        }
                     }
                 }
             }
 
-            final var ratingKeys = new HashSet<RatingKey>();
-            ratingKeys.addAll(ratingRecordByKey.keySet());
-            ratingKeys.addAll(existingRatingRecordByKey.keySet());
+            final var ratingKeys = new HashSet<RatingIdentity>();
+            ratingKeys.addAll(ratingRecordByIdentity.keySet());
+            ratingKeys.addAll(existingRatingRecordByIdentity.keySet());
 
-            for (final RatingKey ratingKey : ratingKeys) {
-                final VulnerabilityRatingRecord ratingRecord = ratingRecordByKey.get(ratingKey);
-                final VulnerabilityRatingRecord existingRatingRecord = existingRatingRecordByKey.get(ratingKey);
+            for (final RatingIdentity ratingIdentity : ratingKeys) {
+                final VulnerabilityRatingRecord ratingRecord = ratingRecordByIdentity.get(ratingIdentity);
+                final VulnerabilityRatingRecord existingRatingRecord = existingRatingRecordByIdentity.get(ratingIdentity);
 
                 if (ratingRecord == null) {
-                    LOGGER.debug("Deleting rating with {} because it is no longer reported", ratingKey);
-                    deleteRatingRecord(handle, ratingKey);
+                    LOGGER.info("{}: deleting {} rating because it is no longer reported", ratingIdentity.vulnId(), ratingIdentity.method());
+                    deleteRatingRecord(handle, ratingIdentity);
                 } else if (existingRatingRecord == null) {
-                    LOGGER.debug("Creating rating with {} because it was not reported before", ratingKey);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating {} rating", ratingIdentity.vulnId(), ratingIdentity.method());
+                    }
                     createRatingRecord(handle, ratingRecord);
                 } else {
-                    boolean hasChanged = false;
-                    hasChanged |= !Objects.equals(ratingRecord.severity(), existingRatingRecord.severity());
-                    hasChanged |= !Objects.equals(ratingRecord.vector(), existingRatingRecord.vector());
-                    hasChanged |= !Objects.equals(ratingRecord.score(),
+                    final var differ = new PropertyDiffer<>(existingRatingRecord, ratingRecord);
+                    differ.diff("severity", VulnerabilityRatingRecord::severity);
+                    differ.diff("vector", VulnerabilityRatingRecord::vector);
+                    differ.diff("score", VulnerabilityRatingRecord::score, (before, after) ->
                             // SQLite driver returns NaN for Double when the column was NULL...
-                            (existingRatingRecord.score() != null && !existingRatingRecord.score().isNaN())
-                                    ? existingRatingRecord.score()
-                                    : null);
+                            Objects.equals(before, (after != null && !after.isNaN()) ? after : null));
 
-                    if (hasChanged) {
-                        LOGGER.info("Updating rating with {} because it changed", ratingKey);
+                    if (!differ.diffs().isEmpty()) {
+                        LOGGER.info("{}: {} rating has changed: {}", ratingIdentity.vulnId(), ratingIdentity.method(), differ.diffs());
                         updateRatingRecord(handle, ratingRecord);
                     } else {
-                        LOGGER.debug("Rating with {} has not changed", ratingKey);
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug("{}: {} rating has not changed", ratingIdentity.vulnId(), ratingIdentity.method());
+                        }
                     }
                 }
             }
 
-            final var referenceKeys = new HashSet<ReferenceKey>();
-            referenceKeys.addAll(referenceRecordByKey.keySet());
-            referenceKeys.addAll(existingReferenceRecordByKey.keySet());
+            final var referenceKeys = new HashSet<ReferenceIdentity>();
+            referenceKeys.addAll(referenceRecordByIdentity.keySet());
+            referenceKeys.addAll(existingReferenceRecordByIdentity.keySet());
 
-            for (final ReferenceKey referenceKey : referenceKeys) {
-                final VulnerabilityReferenceRecord referenceRecord = referenceRecordByKey.get(referenceKey);
-                final VulnerabilityReferenceRecord existingReferenceRecord = existingReferenceRecordByKey.get(referenceKey);
+            for (final ReferenceIdentity referenceIdentity : referenceKeys) {
+                final VulnerabilityReferenceRecord referenceRecord = referenceRecordByIdentity.get(referenceIdentity);
+                final VulnerabilityReferenceRecord existingReferenceRecord = existingReferenceRecordByIdentity.get(referenceIdentity);
 
                 if (referenceRecord == null) {
-                    LOGGER.debug("Deleting reference with {} because it is no longer reported", referenceKey);
-                    deleteReferenceRecord(handle, referenceKey);
+                    LOGGER.info("{}: deleting reference {} because it is no longer reported", referenceIdentity.vulnId(), referenceIdentity.url());
+                    deleteReferenceRecord(handle, referenceIdentity);
                 } else if (existingReferenceRecord == null) {
-                    LOGGER.debug("Creating reference with {} because it was not reported before", referenceKey);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating reference {}", referenceIdentity.vulnId(), referenceIdentity.url());
+                    }
                     createReferenceRecord(handle, referenceRecord);
                 } else {
-                    LOGGER.debug("Reference with {} has not changed", referenceKey);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: reference {} has not changed", referenceIdentity.vulnId(), referenceIdentity.url());
+                    }
                 }
             }
 
-            final var matchingCriteriaKeys = new HashSet<MatchingCriteriaKey>();
-            matchingCriteriaKeys.addAll(matchingCriteriaRecordByKey.keySet());
-            matchingCriteriaKeys.addAll(existingMatchingCriteriaRecordByKey.keySet());
+            final var matchingCriteriaKeys = new HashSet<MatchingCriteriaIdentity>();
+            matchingCriteriaKeys.addAll(matchingCriteriaRecordByIdentity.keySet());
+            matchingCriteriaKeys.addAll(existingMatchingCriteriaRecordByIdentity.keySet());
 
-            for (final MatchingCriteriaKey matchingCriteriaKey : matchingCriteriaKeys) {
+            for (final MatchingCriteriaIdentity matchingCriteriaIdentity : matchingCriteriaKeys) {
                 final MatchingCriteriaRecord matchingCriteriaRecord =
-                        matchingCriteriaRecordByKey.get(matchingCriteriaKey);
+                        matchingCriteriaRecordByIdentity.get(matchingCriteriaIdentity);
                 final MatchingCriteriaRecord existingMatchingCriteriaRecord =
-                        existingMatchingCriteriaRecordByKey.get(matchingCriteriaKey);
+                        existingMatchingCriteriaRecordByIdentity.get(matchingCriteriaIdentity);
 
                 if (matchingCriteriaRecord == null) {
-                    LOGGER.debug("Deleting matching criteria with {} because it is no longer reported", matchingCriteriaKey);
+                    LOGGER.info("{}: deleting matching criteria because it is no longer reported: {}", matchingCriteriaIdentity.vulnId(), existingMatchingCriteriaRecord);
                     deleteMatchingCriteriaRecord(handle, existingMatchingCriteriaRecord.id());
                 } else if (existingMatchingCriteriaRecord == null) {
-                    LOGGER.debug("Creating matching criteria with {} because it was not reported before", matchingCriteriaKey);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating matching criteria because it was not reported before: {}", matchingCriteriaIdentity.vulnId(), matchingCriteriaRecord);
+                    }
                     createMatchingCriteriaRecord(handle, matchingCriteriaRecord);
                 } else {
-                    LOGGER.debug("Matching criteria with {} has not changed", matchingCriteriaKey);
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: matching criteria has not changed: {}", matchingCriteriaIdentity.vulnId(), matchingCriteriaRecord);
+                    }
                 }
             }
         });
@@ -333,13 +351,13 @@ public final class DatabaseImpl implements Database, Closeable {
         final Query query = handle.createQuery(/* language=SQL */ """
                 select *
                   from vuln_alias
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id in (<vulnIds>)
                    and deleted_at is null
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(VulnerabilityAliasRecord.class))
                 .stream()
@@ -355,7 +373,7 @@ public final class DatabaseImpl implements Database, Closeable {
                 , vuln_id
                 , alias_id
                 ) values(
-                  :source.name
+                  :sourceName
                 , :vulnId
                 , :aliasId
                 )
@@ -365,7 +383,7 @@ public final class DatabaseImpl implements Database, Closeable {
                 """);
 
         update
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bind("vulnId", vulnId)
                 .bind("aliasId", aliasId)
                 .execute();
@@ -375,13 +393,13 @@ public final class DatabaseImpl implements Database, Closeable {
         final Update update = handle.createUpdate("""
                 update vuln_alias
                    set deleted_at = unixepoch()
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id = :vulnId
                    and alias_id = :aliasId
                 """);
 
         update
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bind("vulnId", vulnId)
                 .bind("aliasId", aliasId)
                 .execute();
@@ -391,12 +409,12 @@ public final class DatabaseImpl implements Database, Closeable {
         final Query query = handle.createQuery(/* language=SQL */ """
                 select *
                   from vuln_data
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id in (<vulnIds>)
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(VulnerabilityDataRecord.class))
                 .stream()
@@ -449,38 +467,38 @@ public final class DatabaseImpl implements Database, Closeable {
                      , source_updated_at = :sourceUpdatedAt
                      , source_rejected_at = :sourceRejectedAt
                      , updated_at = unixepoch()
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id = :vulnId
                 returning *
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindMethods(dataRecord)
                 .map(ConstructorMapper.of(VulnerabilityDataRecord.class))
                 .one();
     }
 
-    private record RatingKey(String vulnId, String method) {
+    private record RatingIdentity(String vulnId, String method) {
     }
 
-    private Map<RatingKey, VulnerabilityRatingRecord> getRatingRecords(
+    private Map<RatingIdentity, VulnerabilityRatingRecord> getRatingRecords(
             final Handle handle,
             final Collection<String> vulnIds) {
         final Query query = handle.createQuery(/* language=SQL */ """
                 select *
                   from vuln_rating
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id in (<vulnIds>)
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(VulnerabilityRatingRecord.class))
                 .stream()
                 .collect(Collectors.toMap(
-                        record -> new RatingKey(record.vulnId(), record.method()),
+                        record -> new RatingIdentity(record.vulnId(), record.method()),
                         Function.identity()));
     }
 
@@ -521,54 +539,55 @@ public final class DatabaseImpl implements Database, Closeable {
                      , vector = :vector
                      , score = :score
                      , updated_at = unixepoch()
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id = :vulnId
                    and method = :method
                 returning *
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindMethods(ratingRecord)
                 .map(ConstructorMapper.of(VulnerabilityRatingRecord.class))
                 .one();
     }
 
-    private void deleteRatingRecord(final Handle handle, final RatingKey ratingKey) {
+    private void deleteRatingRecord(final Handle handle, final RatingIdentity ratingIdentity) {
         final Update update = handle.createUpdate("""
                 delete
                   from vuln_rating
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id = :vulnId
                    and method = :method
                 """);
 
         update
-                .bindMethods("source", source)
-                .bindMethods(ratingKey)
+                .bind("sourceName", source.name())
+                .bind("vulnId", ratingIdentity.vulnId())
+                .bind("method", ratingIdentity.method())
                 .execute();
     }
 
-    private record ReferenceKey(String vulnId, String url) {
+    private record ReferenceIdentity(String vulnId, String url) {
     }
 
-    private Map<ReferenceKey, VulnerabilityReferenceRecord> getReferenceRecords(
+    private Map<ReferenceIdentity, VulnerabilityReferenceRecord> getReferenceRecords(
             final Handle handle,
             final Collection<String> vulnIds) {
         final Query query = handle.createQuery(/* language=SQL */ """
                 select *
                   from vuln_reference
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id in (<vulnIds>)
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(VulnerabilityReferenceRecord.class))
                 .stream()
                 .collect(Collectors.toMap(
-                        record -> new ReferenceKey(record.vulnId(), record.url()),
+                        record -> new ReferenceIdentity(record.vulnId(), record.url()),
                         Function.identity()));
     }
 
@@ -596,24 +615,24 @@ public final class DatabaseImpl implements Database, Closeable {
                 .one();
     }
 
-    private void deleteReferenceRecord(final Handle handle, final ReferenceKey referenceKey) {
+    private void deleteReferenceRecord(final Handle handle, final ReferenceIdentity referenceIdentity) {
         final Update update = handle.createUpdate("""
                 delete
                   from vuln_reference
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id = :vulnId
                    and url = :url
                 """);
 
         update
-                .bindMethods("source", source)
-                .bind("vulnId", referenceKey.vulnId())
-                .bind("url", referenceKey.url())
+                .bind("sourceName", source.name())
+                .bind("vulnId", referenceIdentity.vulnId())
+                .bind("url", referenceIdentity.url())
                 .execute();
     }
 
     // Same fields as MatchingCriteriaRecord, but omits id, source, and created_at.
-    private record MatchingCriteriaKey(
+    private record MatchingCriteriaIdentity(
             String vulnId,
             String cpe,
             String cpePart,
@@ -624,10 +643,10 @@ public final class DatabaseImpl implements Database, Closeable {
             String purlName,
             String versions,
             String additionalCriteriaType,
-            byte[] additionalCriteria) {
+            ByteBuffer additionalCriteria) {
 
-        private static MatchingCriteriaKey of(final MatchingCriteriaRecord record) {
-            return new MatchingCriteriaKey(
+        private static MatchingCriteriaIdentity of(final MatchingCriteriaRecord record) {
+            return new MatchingCriteriaIdentity(
                     record.vulnId(),
                     record.cpe(),
                     record.cpePart(),
@@ -638,28 +657,33 @@ public final class DatabaseImpl implements Database, Closeable {
                     record.purlName(),
                     record.versions(),
                     record.additionalCriteriaType(),
-                    record.additionalCriteria());
+                    // equals and hashCode implementations of record classes
+                    // don't take array content into consideration.
+                    // Wrap in a ByteBuffer to sidestep this limitation.
+                    record.additionalCriteria() != null
+                            ? ByteBuffer.wrap(record.additionalCriteria())
+                            : null);
         }
 
     }
 
-    private Map<MatchingCriteriaKey, MatchingCriteriaRecord> getMatchingCriteriaRecords(
+    private Map<MatchingCriteriaIdentity, MatchingCriteriaRecord> getMatchingCriteriaRecords(
             final Handle handle,
             final Collection<String> vulnIds) {
         final Query query = handle.createQuery(/* language=SQL */ """
                 select *
                   from matching_criteria
-                 where source_name = :source.name
+                 where source_name = :sourceName
                    and vuln_id in (<vulnIds>)
                 """);
 
         return query
-                .bindMethods("source", source)
+                .bind("sourceName", source.name())
                 .bindList("vulnIds", vulnIds)
                 .map(ConstructorMapper.of(MatchingCriteriaRecord.class))
                 .stream()
                 .collect(Collectors.toMap(
-                        MatchingCriteriaKey::of,
+                        MatchingCriteriaIdentity::of,
                         Function.identity()));
     }
 

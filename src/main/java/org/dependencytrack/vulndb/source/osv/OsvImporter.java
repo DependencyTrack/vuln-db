@@ -18,6 +18,7 @@ import org.metaeffekt.core.security.cvss.v3.Cvss3;
 import org.metaeffekt.core.security.cvss.v4P0.Cvss4P0;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,7 +87,11 @@ public final class OsvImporter implements Importer {
             final Path ecosystemArchivePath = downloadEcosystemArchive(ecosystem);
 
             LOGGER.info("Processing advisories of ecosystem {}", ecosystem);
-            extractEcosystemArchive(ecosystemArchivePath, this::processAdvisory);
+            extractEcosystemArchive(ecosystemArchivePath, advisory -> {
+                try (var ignored = MDC.putCloseable("vulnId", advisory.id())) {
+                    processAdvisory(advisory);
+                }
+            });
         }
     }
 

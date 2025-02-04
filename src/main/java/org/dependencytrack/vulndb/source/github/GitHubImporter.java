@@ -24,6 +24,7 @@ import org.dependencytrack.vulndb.api.Vulnerability;
 import org.metaeffekt.core.security.cvss.CvssVector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -69,7 +70,11 @@ public final class GitHubImporter implements Importer {
             while (apiClient.hasNext()) {
                 final Collection<SecurityAdvisory> advisories = apiClient.next();
                 final List<Vulnerability> vulns = advisories.stream()
-                        .map(this::convert)
+                        .map(advisory -> {
+                            try (var ignored = MDC.putCloseable("vulnId", advisory.getGhsaId())) {
+                                return convert(advisory);
+                            }
+                        })
                         .toList();
                 if (vulns.isEmpty()) {
                     break;
