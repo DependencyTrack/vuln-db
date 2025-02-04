@@ -70,6 +70,9 @@ docker run -it --rm \
 
 ### Scanning
 
+> [!WARNING]
+> Not fully implemented, don't expect useful results yet.
+
 To get a rough idea of the data quality in a database, it can be leveraged
 to scan a CycloneDX Bill of Materials. The implementation of this command
 is also intended to showcase how matching logic may work.
@@ -82,11 +85,168 @@ docker run -it --rm \
   scan --database=all.sqlite bom.json
 ```
 
+## Data model
+
+The following describes the current data model for source databases.  
+The model of the database that eventually is distributed to Dependency-Track instances will likely differ.
+
+> [!WARNING]
+> The model is experimental and may change frequently. Please let us know if you have suggestions to improve it.
+
+A primary concern of the model is to track what data point was reported by which source.  
+We can only make educated decisions as to which source to trust, or what data to prioritize, if we have a complete picture.
+
+```mermaid
+erDiagram
+    source {
+        text name PK
+        text display_name
+        text license
+        text url
+    }
+    
+    source_metadata {
+        text source_name PK, FK
+        text key PK
+        text value
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    vuln {
+        text id PK
+    }
+    
+    vuln_alias {
+        text source_name PK, FK
+        text vuln_id PK, FK
+        text alias_id PK
+        timestamp created_at
+        timestamp deleted_at
+    }
+    
+    vuln_data {
+        text source_name PK, FK
+        text vuln_id PK, FK
+        text description
+        text cwes
+        timestamp source_created_at
+        timestamp source_published_at
+        timestamp source_updated_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    vuln_rating {
+        text source_name PK, FK
+        text vuln_id PK, FK
+        text method PK
+        text severity
+        text vector
+        real score
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    vuln_reference {
+        text source_name PK, FK
+        text vuln_id PK, FK
+        text url PK
+        text name
+    }
+    
+    matching_criteria {
+        integer id PK
+        text source_name FK
+        text vuln_id FK
+        text cpe
+        text cpe_part
+        text cpe_vendor
+        text cpe_product
+        text purl_type
+        text purl_namespace
+        text purl_name
+        text versions
+        text additional_criteria_type
+        blob additional_criteria
+        timestamp created_at
+    }
+
+    source ||--o{ source_metadata: "used by"
+    source ||--o{ vuln_alias: "imported from"
+    source ||--o{ vuln_data: "imported from"
+    source ||--o{ vuln_rating: "imported from"
+    source ||--o{ vuln_reference: "imported from"
+    source ||--o{ matching_criteria: "imported from"
+    vuln_alias }o--|| vuln: "aliases"
+    vuln_data }o--|| vuln: "describes"
+    vuln_rating }o--|| vuln: "rates"
+    vuln_reference }o--|| vuln: "describes"
+    matching_criteria }o--|| vuln: "affects"
+```
+
+The complete SQLite schema is located [here](src/main/resources/schema.sql).
+
+## Extending
+
+### Sources
+
+New sources can be added by implementing the 
+[`Importer`](https://github.com/nscuro/vuln-db/blob/main/src/main/java/org/dependencytrack/vulndb/api/Importer.java)
+interface, and registering the implementation with Java's
+[`ServiceLoader` mechanism](https://github.com/nscuro/vuln-db/blob/main/src/main/resources/META-INF/services/org.dependencytrack.vulndb.api.Importer).
+
+`Importer`s are given access to a `Database` object which can be used to store and retrieve source metadata,
+as well as storing `Vulnerability` records. An `Importer`'s only responsibility is to retrieve data from upstream
+sources, and transform it into the internal data model.
+
 ## Research
 
-The database can be used to conduct research on the data across multiple sources.
+The database(s) may be used to conduct research on the data across multiple sources.
+Gathered insights will help to drive decisions for procurement and enrichment.
 
-### Aliases
+Snapshot builds are published to the GitHub Container Registry, both for each source
+individually, and all sourced merged into one.
+
+They can be downloaded using [`oras`](https://oras.land/docs/installation), 
+and decompressed using [`zstd`](https://github.com/facebook/zstd):
+
+```shell
+oras pull ghcr.io/nscuro/vuln-db/source/all:snapshot
+zstd --decompress --rm all.sqlite.zst
+```
+
+The full list of available artifacts can be found [here](https://github.com/nscuro?tab=packages&repo_name=vuln-db).
+
+SQLite databases can be opened in any common database tool, for example [DBeaver](https://dbeaver.io/)
+or [DB Browser for SQLite](https://sqlitebrowser.org/).
+
+For more complex queries, [DuckDB](https://duckdb.org/) is worth using.  
+It has a [SQLite extension](https://duckdb.org/docs/extensions/sqlite.html) that is trivially enabled:
+
+```shell
+duckdb -c 'install sqlite'
+duckdb all.sqlite
+```
+
+### Open questions
+
+A few questions that could be answered using the data at hand:
+
+- [ ] Is it possible to *reliably* group vulnerabilities by their alias relationship?
+    * Do sources report the same data across aliases, or do they have conflicting information?
+    * If the information is conflicting, which sources are *correct*?
+    * Are alias relationships truly transitive, or not reliable at all?
+- [ ] Given one or more ratings for a vulnerability across multiple sources, how do we pick the *best*?
+    * If there is no way to determine the best, how can we *deterministically* pick one?
+    * Consider the current NVD scenario, where the NVD is authoritative source for CVEs,
+      but is severely lagging behind in rating them.
+- [ ] Is there data in any of the sources that we will need, but the data model doesn't accommodate for it?
+- [ ] Are there sources that are faster to add new vulnerabilities than others?
+- [ ] Are there sources that provide more complete information than others?
+- [ ] Are there sources that generally provide bad data and should *not* be included?
+
+### Example: Aliases
 
 To find the aliases of all CVEs, and which source reported them:
 
@@ -123,7 +283,7 @@ Example output:
 This data could be used to calculate confidences for alias relationships,
 i.e. the more sources report it the higher the confidence.
 
-### Withdrawal across aliases
+### Example: Withdrawal across aliases
 
 Vulnerabilities can be withdrawn or rejected. Taking aliases into consideration,
 is withdrawal consistently declared in all sources?
