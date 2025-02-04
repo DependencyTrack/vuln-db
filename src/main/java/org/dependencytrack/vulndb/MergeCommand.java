@@ -36,7 +36,7 @@ public class MergeCommand implements Runnable {
         for (final Path inputFilePath : inputFilePaths) {
             try (final Handle handle = jdbi.open();
                  var ignoredMdcInputFile = MDC.putCloseable("inputFile", inputFilePath.toString())) {
-                handle.execute("attach database ? as other", inputFilePath);
+                handle.execute("attach database ? as other", inputFilePath.toString());
 
                 LOGGER.info("Merging source tables");
                 handle.execute("""
