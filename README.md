@@ -255,30 +255,38 @@ with cve_aliases as(
   select vuln_id
        , alias_id
        , source_name
-    from vuln_alias
-   where vuln_id like 'CVE-%'
-   union
+  from vuln_alias
+  where vuln_id like 'CVE-%'
+  union
   select alias_id as vuln_id
        , vuln_id as alias_id
        , source_name
-    from vuln_alias
-   where alias_id like 'CVE-%'
+  from vuln_alias
+  where alias_id like 'CVE-%'
 )
-select *
-  from cve_aliases
- order by vuln_id desc
- limit 5
+select vuln_id
+     , json_group_array(json_object(source_name, alias_id)) as aliases
+from cve_aliases
+group by vuln_id
+order by vuln_id desc
+limit 10
 ```
 
 Example output:
 
-| vuln\_id       | alias\_id           | source\_name |
-|:---------------|:--------------------|:-------------|
-| CVE-2025-24891 | GHSA-24f2-fv38-3274 | osv          |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | github       |
-| CVE-2025-24884 | GHSA-hcr5-wv4p-h2g2 | osv          |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | github       |
-| CVE-2025-24883 | GHSA-q26p-9cq4-7fc2 | osv          |
+| vuln\_id       | aliases                                                                                          |
+|:---------------|:-------------------------------------------------------------------------------------------------|
+| CVE-2025-24898 | `[{"github":"GHSA-rpmj-rpgj-qmpm"}]`                                                             |
+| CVE-2025-24884 | `[{"github":"GHSA-hcr5-wv4p-h2g2"},{"osv":"GHSA-hcr5-wv4p-h2g2"}]`                               |
+| CVE-2025-24883 | `[{"github":"GHSA-q26p-9cq4-7fc2"},{"osv":"GHSA-q26p-9cq4-7fc2"}]`                               |
+| CVE-2025-24882 | `[{"github":"GHSA-qv35-3gw6-8q4j"},{"osv":"GHSA-qv35-3gw6-8q4j"},{"osv":"GO-2024-3038"}]`        |
+| CVE-2025-24856 | `[{"github":"GHSA-hj78-p4h7-m5fv"}]`                                                             |
+| CVE-2025-24814 | `[{"osv":"BIT-solr-2025-24814"},{"github":"GHSA-68r2-fwcg-qpm8"},{"osv":"GHSA-68r2-fwcg-qpm8"}]` |
+| CVE-2025-24802 | `[{"github":"GHSA-hj49-h7fq-px5h"}]`                                                             |
+| CVE-2025-24800 | `[{"github":"GHSA-wwx5-gpgr-vxr7"}]`                                                             |
+| CVE-2025-24795 | `[{"github":"GHSA-r2x6-cjg7-8r43"}]`                                                             |
+| CVE-2025-24794 | `[{"github":"GHSA-m4f6-vcj4-w5mx"}]`                                                             |
+
 
 This data could be used to calculate confidences for alias relationships,
 i.e. the more sources report it the higher the confidence.
