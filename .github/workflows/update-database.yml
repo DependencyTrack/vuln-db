@@ -45,7 +45,7 @@ jobs:
         echo '${{ secrets.GITHUB_TOKEN }}' | oras login ghcr.io -u github --password-stdin
     - name: Pull latest database
       run: |
-        oras pull 'ghcr.io/${{ github.repository }}/source/${{ matrix.source }}:${{ inputs.database-version }}' \
+        oras pull "ghcr.io/${GITHUB_REPOSITORY,,}/source/${{ matrix.source }}:${{ inputs.database-version }}" \
           && zstd --decompress --rm '${{ matrix.source }}.sqlite.zst' \
           || echo 'No existing database found for source ${{ matrix.source }} and version ${{ inputs.database-version }}'
     - name: Update database
@@ -55,7 +55,7 @@ jobs:
           -e 'NVD_TOKEN=${{ secrets.NVD_TOKEN }}' \
           -v "$(pwd):/workspace" \
           -w '/workspace' \
-          ghcr.io/${{ github.repository }}:${{ inputs.cli-version }} \
+          "ghcr.io/${GITHUB_REPOSITORY,,}:${{ inputs.cli-version }}" \
           import ${{ matrix.source }}
     - name: Compress database
       run: |
@@ -63,7 +63,7 @@ jobs:
     - name: Push database
       run: |
         oras push --verbose \
-          'ghcr.io/${{ github.repository }}/source/${{ matrix.source }}:${{ inputs.database-version }}' \
+          "ghcr.io/${GITHUB_REPOSITORY,,}/source/${{ matrix.source }}:${{ inputs.database-version }}" \
           '${{ matrix.source }}.sqlite.zst'
 
   merge-source-databases:
@@ -83,7 +83,7 @@ jobs:
     - name: Download source databases
       run: |
         for source_name in github nvd osv; do
-          oras pull "ghcr.io/${{ github.repository }}/source/${source_name}:${{ inputs.database-version }}"
+          oras pull "ghcr.io/${GITHUB_REPOSITORY,,}/source/${source_name}:${{ inputs.database-version }}"
         done
     - name: Decompress source databases
       run: |
@@ -93,7 +93,7 @@ jobs:
         docker run --rm \
           -v "$(pwd):/workspace" \
           -w '/workspace' \
-          ghcr.io/${{ github.repository }}:${{ inputs.cli-version }} \
+          "ghcr.io/${GITHUB_REPOSITORY,,}:${{ inputs.cli-version }}" \
           merge --output=all.sqlite *.sqlite
     - name: Compress merged database
       run: |
@@ -101,5 +101,5 @@ jobs:
     - name: Push database
       run: |
         oras push --verbose \
-          'ghcr.io/${{ github.repository }}/source/all:${{ inputs.database-version }}' \
+          "ghcr.io/${GITHUB_REPOSITORY,,}/source/all:${{ inputs.database-version }}" \
           'all.sqlite.zst'

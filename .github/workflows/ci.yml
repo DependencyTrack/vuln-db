@@ -64,10 +64,15 @@ jobs:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Determine Container Repository
+      id: determine-container-repo
+      run: |
+        # Repository must name must be lowercase.
+        echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
     - name: Build and Push Container Image
       uses: docker/build-push-action@v6.12.0
       with:
-        tags: ghcr.io/${{ github.repository }}:snapshot
+        tags: ghcr.io/${{ steps.determine-container-repo.outputs.repo }}:snapshot
         platforms: linux/amd64,linux/arm64
         push: true
         context: .

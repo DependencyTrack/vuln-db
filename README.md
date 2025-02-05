@@ -48,7 +48,7 @@ docker run -it --rm \
   -e 'NVD_TOKEN=<your_nvd_token>' \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
-  ghcr.io/nscuro/vuln-db:snapshot \
+  ghcr.io/dependencytrack/vuln-db:snapshot \
   import github nvd osv
 ```
 
@@ -64,7 +64,7 @@ This will populate the following database files in parallel:
 docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
-  ghcr.io/nscuro/vuln-db:snapshot \
+  ghcr.io/dependencytrack/vuln-db:snapshot \
   merge --output=all.sqlite github.sqlite nvd.sqlite osv.sqlite
 ```
 
@@ -81,7 +81,7 @@ is also intended to showcase how matching logic may work.
 docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
-  ghcr.io/nscuro/vuln-db:snapshot \
+  ghcr.io/dependencytrack/vuln-db:snapshot \
   scan --database=all.sqlite bom.json
 ```
 
@@ -192,9 +192,9 @@ The complete SQLite schema is located [here](src/main/resources/schema.sql).
 ### Sources
 
 New sources can be added by implementing the 
-[`Importer`](https://github.com/nscuro/vuln-db/blob/main/src/main/java/org/dependencytrack/vulndb/api/Importer.java)
+[`Importer`](src/main/java/org/dependencytrack/vulndb/api/Importer.java)
 interface, and registering the implementation with Java's
-[`ServiceLoader` mechanism](https://github.com/nscuro/vuln-db/blob/main/src/main/resources/META-INF/services/org.dependencytrack.vulndb.api.Importer).
+[`ServiceLoader` mechanism](src/main/resources/META-INF/services/org.dependencytrack.vulndb.api.Importer).
 
 `Importer`s are given access to a `Database` object which can be used to store and retrieve source metadata,
 as well as storing `Vulnerability` records. An `Importer`'s only responsibility is to retrieve data from upstream
@@ -212,11 +212,11 @@ They can be downloaded using [`oras`](https://oras.land/docs/installation),
 and decompressed using [`zstd`](https://github.com/facebook/zstd):
 
 ```shell
-oras pull ghcr.io/nscuro/vuln-db/source/all:snapshot
+oras pull ghcr.io/dependencytrack/vuln-db/source/all:snapshot
 zstd --decompress --rm all.sqlite.zst
 ```
 
-The full list of available artifacts can be found [here](https://github.com/nscuro?tab=packages&repo_name=vuln-db).
+The full list of available artifacts can be found [here](https://github.com/DependencyTrack?tab=packages&repo_name=vuln-db).
 
 SQLite databases can be opened in any common database tool, for example [DBeaver](https://dbeaver.io/)
 or [DB Browser for SQLite](https://sqlitebrowser.org/).
