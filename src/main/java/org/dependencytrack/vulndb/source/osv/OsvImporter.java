@@ -225,7 +225,7 @@ public final class OsvImporter implements Importer {
                     }
 
                     ratings.add(new Rating(
-                            Rating.Method.CVSSv3,
+                            method,
                             Rating.Severity.ofCvss(vector),
                             vector.toString(),
                             vector.getBaseScore()));
