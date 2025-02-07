@@ -1,4 +1,4 @@
-package org.dependencytrack.vulndb;
+package org.dependencytrack.vulndb.cli;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -11,10 +11,10 @@ import picocli.CommandLine.Command;
                 ImportCommand.class,
                 MergeCommand.class,
                 ScanCommand.class})
-public class Application {
+public class MainCommand {
 
     public static void main(final String[] args) {
-        System.exit(new CommandLine(new Application()).execute(args));
+        System.exit(new CommandLine(new MainCommand()).execute(args));
     }
 
 }

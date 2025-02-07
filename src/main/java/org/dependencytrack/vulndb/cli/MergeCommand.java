@@ -1,4 +1,4 @@
-package org.dependencytrack.vulndb;
+package org.dependencytrack.vulndb.cli;
 
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;

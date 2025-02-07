@@ -149,7 +149,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>org.dependencytrack.vulndb.Application</mainClass>
+                            <mainClass>org.dependencytrack.vulndb.cli.MainCommand</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

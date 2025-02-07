@@ -1,4 +1,4 @@
-package org.dependencytrack.vulndb;
+package org.dependencytrack.vulndb.cli;
 
 import org.dependencytrack.vulndb.api.Importer;
 import org.dependencytrack.vulndb.api.Source;

@@ -1,4 +1,4 @@
-package org.dependencytrack.vulndb;
+package org.dependencytrack.vulndb.cli;
 
 import com.github.packageurl.MalformedPackageURLException;
 import com.github.packageurl.PackageURL;
