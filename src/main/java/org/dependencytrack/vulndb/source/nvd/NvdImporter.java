@@ -229,13 +229,14 @@ public final class NvdImporter implements Importer {
 
         return new Vulnerability(
                 cveItem.getId(),
-                null,
+                /* aliases */ null,
+                /* related */ null,
                 convertDescriptions(cveItem.getDescriptions()),
                 convertWeaknesses(cveItem.getWeaknesses()),
                 !ratings.isEmpty() ? ratings : null,
                 convertReferences(cveItem.getReferences()),
                 !matchingCriteriaList.isEmpty() ? matchingCriteriaList : null,
-                null,
+                /* createdAt */ null,
                 cveItem.getPublished() != null
                         ? cveItem.getPublished().toInstant()
                         : null,

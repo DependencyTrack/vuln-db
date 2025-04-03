@@ -31,8 +31,19 @@ create table if not exists vuln_alias(
 , primary key(source_name, vuln_id, alias_id)
 , foreign key(source_name) references source(name)
 , foreign key(vuln_id) references vuln(id)
--- Prevent a vuln ID aliasing itself.
-, check(vuln_id != alias_id)
+, check(vuln_id != alias_id) -- Prevent a vuln ID aliasing itself.
+);
+
+create table if not exists vuln_related(
+  source_name text not null -- Name of the source claiming this relation.
+, vuln_id text not null -- ID of the vulnerability being related to.
+, related_id text not null -- ID of the related vulnerability.
+, created_at integer not null default (unixepoch()) -- When the record was created in the database.
+, deleted_at integer -- When the record was deleted in the database (i.e. no longer reported by the source).
+, primary key(source_name, vuln_id, related_id)
+, foreign key(source_name) references source(name)
+, foreign key(vuln_id) references vuln(id)
+, check(vuln_id != related_id) -- Prevent a vuln ID relation to itself.
 );
 
 -- Vulnerability data as provided by a source.

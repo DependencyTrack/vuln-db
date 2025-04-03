@@ -254,12 +254,13 @@ public final class OsvImporter implements Importer {
         final var vuln = new Vulnerability(
                 advisory.id(),
                 advisory.aliases(),
+                advisory.related(),
                 advisory.details(),
                 !cwes.isEmpty() ? cwes : null,
                 !ratings.isEmpty() ? ratings : null,
-                null,
+                /* references */ null,
                 !matchingCriteriaList.isEmpty() ? matchingCriteriaList : null,
-                null,
+                /* createdAt */ null,
                 advisory.published(),
                 advisory.modified(),
                 advisory.withdrawn());

@@ -209,12 +209,13 @@ public final class GitHubImporter implements Importer {
         return new Vulnerability(
                 advisory.getGhsaId(),
                 !aliases.isEmpty() ? aliases : null,
+                /* related */ null,
                 advisory.getDescription(),
                 !cwes.isEmpty() ? cwes : null,
                 !ratings.isEmpty() ? ratings : null,
                 !references.isEmpty() ? references : null,
                 !matchingCriteriaList.isEmpty() ? matchingCriteriaList : null,
-                null,
+                /* createdAt */ null,
                 advisory.getPublishedAt() != null
                         ? advisory.getPublishedAt().toInstant()
                         : null,

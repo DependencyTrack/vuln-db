@@ -149,6 +149,7 @@ public final class DatabaseImpl implements Database, Closeable {
     public void storeVulnerabilities(final Collection<Vulnerability> vulns) {
         final var vulnIds = new HashSet<String>();
         final var aliasesByVulnId = new HashMap<String, List<String>>();
+        final var relatedByVulnId = new HashMap<String, List<String>>();
         final var dataRecordByVulnId = new HashMap<String, VulnerabilityDataRecord>(vulns.size());
         final var ratingRecordByIdentity = new HashMap<RatingIdentity, VulnerabilityRatingRecord>(vulns.size());
         final var referenceRecordByIdentity = new HashMap<ReferenceIdentity, VulnerabilityReferenceRecord>(vulns.size());
@@ -159,6 +160,10 @@ public final class DatabaseImpl implements Database, Closeable {
 
             if (vuln.aliases() != null) {
                 aliasesByVulnId.put(vuln.id(), vuln.aliases());
+            }
+
+            if (vuln.related() != null) {
+                relatedByVulnId.put(vuln.id(), vuln.related());
             }
 
             dataRecordByVulnId.put(vuln.id(), VulnerabilityDataRecord.of(source, vuln));
@@ -190,6 +195,8 @@ public final class DatabaseImpl implements Database, Closeable {
         jdbi.useTransaction(handle -> {
             final Map<String, List<String>> existingAliasesByVulnId =
                     getAliases(handle, vulnIds);
+            final Map<String, List<String>> existingRelatedIdsByVulnId =
+                    getRelatedIds(handle, vulnIds);
             final Map<String, VulnerabilityDataRecord> existingDataRecordByVulnId =
                     getDataRecords(handle, vulnIds);
             final Map<RatingIdentity, VulnerabilityRatingRecord> existingRatingRecordByIdentity =
@@ -207,7 +214,7 @@ public final class DatabaseImpl implements Database, Closeable {
                 final List<String> aliasesToCreate = aliases.stream()
                         .filter(not(existingAliases::contains))
                         .toList();
-                final List<String> aliasesToDelete = aliases.stream()
+                final List<String> aliasesToDelete = existingAliases.stream()
                         .filter(not(aliases::contains))
                         .toList();
                 for (final String aliasId : aliasesToCreate) {
@@ -219,6 +226,25 @@ public final class DatabaseImpl implements Database, Closeable {
                 for (final String aliasId : aliasesToDelete) {
                     LOGGER.info("{}: deleting alias {} because it is no longer reported", vulnId, aliasId);
                     deleteAlias(handle, vulnId, aliasId);
+                }
+
+                final List<String> relatedIds = relatedByVulnId.getOrDefault(vulnId, Collections.emptyList());
+                final List<String> existingRelatedIds = existingRelatedIdsByVulnId.getOrDefault(vulnId, Collections.emptyList());
+                final List<String> relatedIdsToCreate = relatedIds.stream()
+                        .filter(not(existingRelatedIds::contains))
+                        .toList();
+                final List<String> relatedIdsToDelete = existingRelatedIds.stream()
+                        .filter(not(relatedIds::contains))
+                        .toList();
+                for (final String relatedId : relatedIdsToCreate) {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{}: creating related ID {}", vulnId, relatedId);
+                    }
+                    createRelated(handle, vulnId, relatedId);
+                }
+                for (final String relatedId : relatedIdsToDelete) {
+                    LOGGER.info("{}: deleting related ID {} because it is no longer reported", vulnId, relatedId);
+                    deleteRelated(handle, vulnId, relatedId);
                 }
 
                 final VulnerabilityDataRecord dataRecord = dataRecordByVulnId.get(vulnId);
@@ -402,6 +428,64 @@ public final class DatabaseImpl implements Database, Closeable {
                 .bind("sourceName", source.name())
                 .bind("vulnId", vulnId)
                 .bind("aliasId", aliasId)
+                .execute();
+    }
+
+    private Map<String, List<String>> getRelatedIds(final Handle handle, final Collection<String> vulnIds) {
+        final Query query = handle.createQuery(/* language=SQL */ """
+                select *
+                  from vuln_related
+                 where source_name = :sourceName
+                   and vuln_id in (<vulnIds>)
+                   and deleted_at is null
+                """);
+
+        return query
+                .bind("sourceName", source.name())
+                .bindList("vulnIds", vulnIds)
+                .map(ConstructorMapper.of(VulnerabilityRelatedRecord.class))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        VulnerabilityRelatedRecord::vulnId,
+                        Collectors.mapping(VulnerabilityRelatedRecord::relatedId, Collectors.toList())));
+    }
+
+    private void createRelated(final Handle handle, final String vulnId, final String relatedId) {
+        final Update update = handle.createUpdate(/* language=SQL */ """
+                insert into vuln_related(
+                  source_name
+                , vuln_id
+                , related_id
+                ) values(
+                  :sourceName
+                , :vulnId
+                , :relatedId
+                )
+                on conflict(source_name, vuln_id, related_id) do update
+                set deleted_at = null
+                where vuln_related.deleted_at is not null
+                """);
+
+        update
+                .bind("sourceName", source.name())
+                .bind("vulnId", vulnId)
+                .bind("relatedId", relatedId)
+                .execute();
+    }
+
+    private void deleteRelated(final Handle handle, final String vulnId, final String relatedId) {
+        final Update update = handle.createUpdate(/* language=SQL */ """
+                update vuln_related
+                   set deleted_at = unixepoch()
+                 where source_name = :sourceName
+                   and vuln_id = :vulnId
+                   and related_id = :relatedId
+                """);
+
+        update
+                .bind("sourceName", source.name())
+                .bind("vulnId", vulnId)
+                .bind("relatedId", relatedId)
                 .execute();
     }
 
