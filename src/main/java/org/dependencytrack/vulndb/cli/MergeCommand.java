@@ -91,6 +91,25 @@ public class MergeCommand implements Runnable {
                            or excluded.deleted_at is distinct from main.vuln_alias.deleted_at 
                         """);
 
+                LOGGER.info("Merging vuln_related tables");
+                handle.execute("""
+                        insert into main.vuln_related(
+                          source_name
+                        , vuln_id
+                        , related_id
+                        , created_at
+                        , deleted_at
+                        )
+                        select * 
+                          from other.vuln_related
+                         where 1 = 1
+                        on conflict(source_name, vuln_id, related_id) do update
+                        set created_at = excluded.created_at
+                          , deleted_at = excluded.deleted_at
+                        where excluded.created_at > main.vuln_related.created_at
+                           or excluded.deleted_at is distinct from main.vuln_related.deleted_at 
+                        """);
+
                 LOGGER.info("Merging vuln_data tables");
                 handle.execute("""
                         insert into main.vuln_data(
