@@ -82,7 +82,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/dependencytrack/vuln-db:snapshot \
-  scan --database=all.sqlite bom.json
+  scan --ensure-indexes --database=all.sqlite bom.json
 ```
 
 ## Data model

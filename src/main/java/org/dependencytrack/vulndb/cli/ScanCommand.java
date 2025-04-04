@@ -35,6 +35,9 @@ public class ScanCommand implements Callable<Integer> {
     @Option(names = {"-d", "--database"})
     Path databaseFilePath;
 
+    @Option(names = {"-i", "--ensure-indexes"})
+    boolean ensureIndexes;
+
     @Parameters
     Path bomFilePath;
 
@@ -44,6 +47,22 @@ public class ScanCommand implements Callable<Integer> {
                 .create("jdbc:sqlite:%s".formatted(databaseFilePath))
                 .installPlugin(new SQLitePlugin());
 
+        if (ensureIndexes) {
+            jdbi.useHandle(handle -> {
+                handle.execute("""
+                        create index if not exists matching_criteria_purl_ns_idx
+                            on matching_criteria(purl_type, purl_namespace, purl_name)
+                         where purl_namespace is not null;
+                        """);
+
+                handle.execute("""
+                        create index if not exists matching_criteria_purl_idx
+                            on matching_criteria(purl_type, purl_name)
+                         where purl_namespace is null;
+                        """);
+            });
+        }
+
         final byte[] bomBytes = Files.readAllBytes(bomFilePath);
         final Bom bom = BomParserFactory.createParser(bomBytes).parse(bomBytes);
 
@@ -51,8 +70,8 @@ public class ScanCommand implements Callable<Integer> {
             // TODO: Consider metadata.component, nested components etc.
 
             for (final Component component : bom.getComponents()) {
-                final Set<String> vulnIds = scan(handle, component);
-                if (!vulnIds.isEmpty()) {
+                final Set<MatchMetadata> matches = scan(handle, component);
+                if (!matches.isEmpty()) {
                     String componentName = component.getName();
                     if (component.getGroup() != null) {
                         componentName = component.getGroup() + "/" + componentName;
@@ -62,7 +81,14 @@ public class ScanCommand implements Callable<Integer> {
                     }
 
                     // TODO: Move reporting to the very end.
-                    System.out.println(componentName + ": " + vulnIds.stream().sorted().toList());
+                    System.out.println(componentName + ":");
+                    for (final MatchMetadata match : matches) {
+                        System.out.println("- %s\n  Matched range: %s\n  Source: %s".formatted(
+                                match.vulnId(),
+                                match.criteriaVers(),
+                                match.criteriaSource()));
+                    }
+                    System.out.println();
                 }
             }
         }
@@ -74,10 +100,16 @@ public class ScanCommand implements Callable<Integer> {
         return 0;
     }
 
-    private Set<String> scan(
+    private record MatchMetadata(
+            String vulnId,
+            String criteriaSource,
+            String criteriaVers) {
+    }
+
+    private Set<MatchMetadata> scan(
             final Handle handle,
             final Component component) throws MalformedPackageURLException, CpeParsingException {
-        final var affectedVulnIds = new HashSet<String>();
+        final var affectedVulnIds = new HashSet<MatchMetadata>();
 
         if (component.getCpe() != null) {
             final var cpe = CpeParser.parse(component.getCpe());
@@ -99,9 +131,31 @@ public class ScanCommand implements Callable<Integer> {
 
                 final Vers vers = Vers.parse(criteriaRecord.versions());
                 if (vers.contains(purl.getVersion())) {
-                    // TODO: Check additional criteria.
+                    // Handle cases where a Debian vulnerability only apply to specific
+                    // releases of Debian. Note that this requires both the criteria, as well
+                    // as the package to declare a Debian release version.
+                    // It can't be reliably deduced from package versions or vers ranges alone.
+                    // TODO: For the love of god make this less atrocious.
+                    if (purl.getType().equals(PackageURL.StandardTypes.DEBIAN)
+                        && purl.getQualifiers() != null
+                        && purl.getQualifiers().containsKey("distro")
+                        && purl.getQualifiers().get("distro").startsWith("debian-")
+                        && "debian-version".equals(criteriaRecord.additionalCriteriaType())) {
+                        final String distroVersion = purl.getQualifiers().get("distro").replaceFirst("^debian-", "");
+                        if (!distroVersion.startsWith(new String(criteriaRecord.additionalCriteria()))) {
+                            System.out.println(
+                                    "Discarding range %s due to Debian version mismatch (package=%s, criteria=%s)".formatted(
+                                            criteriaRecord.versions(), distroVersion, new String(criteriaRecord.additionalCriteria())));
+                            continue;
+                        }
+                    }
 
-                    affectedVulnIds.add(criteriaRecord.vulnId());
+                    // TODO: Check more additional criteria types.
+
+                    affectedVulnIds.add(new MatchMetadata(
+                            criteriaRecord.vulnId(),
+                            criteriaRecord.sourceName(),
+                            criteriaRecord.versions()));
                 }
             }
         }

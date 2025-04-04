@@ -177,6 +177,14 @@ public final class OsvImporter implements Importer {
                     } catch (IOException e) {
                         LOGGER.warn("Failed to serialize go-imports {}", imports, e);
                     }
+                } else if (affected.pkg().ecosystem().toLowerCase().startsWith("debian")) {
+                    final String[] ecosystemParts = affected.pkg().ecosystem().split(":", 2);
+                    if (ecosystemParts.length == 2) {
+                        // TODO: Should be a JSON object to make it less ambiguous.
+                        // TODO: Can this be generalized? Do we need this for RedHat etc. too?
+                        additionalCriteria = ecosystemParts[1].trim().getBytes();
+                        additionalCriteriaType = "debian-version";
+                    }
                 }
 
                 if (affected.ranges() != null) {
