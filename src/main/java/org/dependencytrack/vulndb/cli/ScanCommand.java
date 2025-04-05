@@ -13,6 +13,7 @@ import org.jdbi.v3.core.mapper.reflect.ConstructorMapper;
 import org.jdbi.v3.core.statement.Query;
 import org.jdbi.v3.sqlite3.SQLitePlugin;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Help.Ansi;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import us.springett.parsers.cpe.Cpe;
@@ -23,10 +24,13 @@ import us.springett.parsers.cpe.values.Part;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 
 @Command(name = "scan", description = "Test a database by scanning BOMs.")
@@ -47,49 +51,65 @@ public class ScanCommand implements Callable<Integer> {
                 .create("jdbc:sqlite:%s".formatted(databaseFilePath))
                 .installPlugin(new SQLitePlugin());
 
-        if (ensureIndexes) {
-            jdbi.useHandle(handle -> {
-                handle.execute("""
-                        create index if not exists matching_criteria_purl_ns_idx
-                            on matching_criteria(purl_type, purl_namespace, purl_name)
-                         where purl_namespace is not null;
-                        """);
-
-                handle.execute("""
-                        create index if not exists matching_criteria_purl_idx
-                            on matching_criteria(purl_type, purl_name)
-                         where purl_namespace is null;
-                        """);
-            });
-        }
+        maybeCreateIndexes(jdbi);
 
         final byte[] bomBytes = Files.readAllBytes(bomFilePath);
         final Bom bom = BomParserFactory.createParser(bomBytes).parse(bomBytes);
+
+        final var matchesByComponentByVulnId = new TreeMap<String, Map<Component, Set<MatchMetadata>>>();
 
         try (final Handle handle = jdbi.open()) {
             // TODO: Consider metadata.component, nested components etc.
 
             for (final Component component : bom.getComponents()) {
                 final Set<MatchMetadata> matches = scan(handle, component);
-                if (!matches.isEmpty()) {
-                    String componentName = component.getName();
-                    if (component.getGroup() != null) {
-                        componentName = component.getGroup() + "/" + componentName;
-                    }
-                    if (component.getVersion() != null) {
-                        componentName = componentName + "@" + component.getVersion();
-                    }
-
-                    // TODO: Move reporting to the very end.
-                    System.out.println(componentName + ":");
-                    for (final MatchMetadata match : matches) {
-                        System.out.println("- %s\n  Matched range: %s\n  Source: %s".formatted(
-                                match.vulnId(),
-                                match.criteriaVers(),
-                                match.criteriaSource()));
-                    }
-                    System.out.println();
+                if (matches.isEmpty()) {
+                    continue;
                 }
+
+                for (final MatchMetadata match : matches) {
+                    final Map<Component, Set<MatchMetadata>> matchesByComponent =
+                            matchesByComponentByVulnId.computeIfAbsent(
+                                    match.vulnId(), ignored -> new TreeMap<>(
+                                            Comparator.comparing(Component::getName)
+                                                    .thenComparing(Component::getVersion)));
+
+                    matchesByComponent.computeIfAbsent(
+                            component, ignored -> new HashSet<>()).add(match);
+                }
+            }
+        }
+
+        if (matchesByComponentByVulnId.isEmpty()) {
+            System.out.println("@|bold,green no vulnerabilities identified|@");
+            return 0;
+        }
+
+        for (final String vulnId : matchesByComponentByVulnId.keySet()) {
+            final Map<Component, Set<MatchMetadata>> matchesByComponent = matchesByComponentByVulnId.get(vulnId);
+
+            System.out.println(Ansi.AUTO.string("@|bold,red,underline %s|@".formatted(vulnId)));
+
+            for (final Map.Entry<Component, Set<MatchMetadata>> entry : matchesByComponent.entrySet()) {
+                final Component component = entry.getKey();
+                final Set<MatchMetadata> matches = entry.getValue();
+
+                String componentName = component.getName();
+                if (component.getGroup() != null) {
+                    componentName = component.getGroup() + "/" + componentName;
+                }
+                if (component.getVersion() != null) {
+                    componentName = componentName + "@" + component.getVersion();
+                }
+
+                System.out.println("- " + componentName);
+
+                for (final MatchMetadata match : matches) {
+                    System.out.println(Ansi.AUTO.string("  + matched: @|italic %s|@ (source: %s)".formatted(
+                            match.criteriaVers(), match.criteriaSource())));
+                }
+
+                System.out.println();
             }
         }
 
@@ -98,6 +118,26 @@ public class ScanCommand implements Callable<Integer> {
         //  machine-readable output to enable diffing.
 
         return 0;
+    }
+
+    private void maybeCreateIndexes(final Jdbi jdbi) {
+        if (!ensureIndexes) {
+            return;
+        }
+
+        jdbi.useHandle(handle -> {
+            handle.execute("""
+                    create index if not exists matching_criteria_purl_ns_idx
+                        on matching_criteria(purl_type, purl_namespace, purl_name)
+                     where purl_namespace is not null;
+                    """);
+
+            handle.execute("""
+                    create index if not exists matching_criteria_purl_idx
+                        on matching_criteria(purl_type, purl_name)
+                     where purl_namespace is null;
+                    """);
+        });
     }
 
     private record MatchMetadata(
