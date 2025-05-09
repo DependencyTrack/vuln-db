@@ -70,7 +70,7 @@
         <dependency>
             <groupId>io.github.jeremylong</groupId>
             <artifactId>open-vulnerability-clients</artifactId>
-            <version>7.3.2</version>
+            <version>8.0.0</version>
         </dependency>
 
         <dependency>
