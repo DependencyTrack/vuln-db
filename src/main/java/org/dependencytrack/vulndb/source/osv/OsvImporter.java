@@ -1,5 +1,6 @@
 package org.dependencytrack.vulndb.source.osv;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.github.packageurl.MalformedPackageURLException;
@@ -69,6 +70,7 @@ public final class OsvImporter implements Importer {
         this.database = database;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .registerModule(new JavaTimeModule());
     }
 
@@ -258,6 +260,9 @@ public final class OsvImporter implements Importer {
                 LOGGER.warn("Unexpected format of cwe_ids: {}", advisory.databaseSpecific().get("cwe_ids"));
             }
         }
+
+        // TODO: OSV supports "upstream" IDs that are neither aliases nor related IDs. How to deal with those?
+        //  https://ossf.github.io/osv-schema/#upstream-field
 
         final var vuln = new Vulnerability(
                 advisory.id(),
