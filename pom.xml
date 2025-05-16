@@ -16,7 +16,7 @@
         <dependency>
             <groupId>org.metaeffekt.core</groupId>
             <artifactId>ae-security</artifactId>
-            <version>0.136.0</version>
+            <version>0.138.0</version>
         </dependency>
 
         <dependency>
