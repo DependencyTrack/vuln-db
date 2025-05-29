@@ -33,6 +33,7 @@ jobs:
     strategy:
       matrix:
         source:
+        - euvd
         - github
         - nvd
         - osv
@@ -82,7 +83,7 @@ jobs:
         echo '${{ secrets.GITHUB_TOKEN }}' | oras login ghcr.io -u github --password-stdin
     - name: Download source databases
       run: |
-        for source_name in github nvd osv; do
+        for source_name in euvd github nvd osv; do
           oras pull "ghcr.io/${GITHUB_REPOSITORY,,}/source/${source_name}:${{ inputs.database-version }}"
         done
     - name: Decompress source databases
