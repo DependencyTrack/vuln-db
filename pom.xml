@@ -10,106 +10,122 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Dependency versions -->
+        <lib.ae-security.version>0.138.0</lib.ae-security.version>
+        <lib.cyclonedx-core-java.version>10.2.1</lib.cyclonedx-core-java.version>
+        <lib.apache-httpclient5.version>5.5</lib.apache-httpclient5.version>
+        <lib.cpe-parser.version>3.0.0</lib.cpe-parser.version>
+        <lib.jackson.version>2.19.0</lib.jackson.version>
+        <lib.jdbi.version>3.49.4</lib.jdbi.version>
+        <lib.jspecify.version>1.0.0</lib.jspecify.version>
+        <lib.logback.version>1.5.18</lib.logback.version>
+        <lib.open-vulnerability-clients.version>8.0.0</lib.open-vulnerability-clients.version>
+        <lib.packageurl-java.version>1.5.0</lib.packageurl-java.version>
+        <lib.picocli.version>4.7.7</lib.picocli.version>
+        <lib.slf4j.version>2.0.17</lib.slf4j.version>
+        <lib.sqlite-jdbc.version>3.49.1.0</lib.sqlite-jdbc.version>
+        <lib.versatile.version>0.12.0</lib.versatile.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.metaeffekt.core</groupId>
             <artifactId>ae-security</artifactId>
-            <version>0.138.0</version>
+            <version>${lib.ae-security.version}</version>
         </dependency>
 
         <dependency>
             <groupId>us.springett</groupId>
             <artifactId>cpe-parser</artifactId>
-            <version>3.0.0</version>
+            <version>${lib.cpe-parser.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-core-java</artifactId>
-            <version>10.2.1</version>
+            <version>${lib.cyclonedx-core-java.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
-            <version>5.5</version>
-        </dependency>
-
-        <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.5.18</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.package-url</groupId>
-            <artifactId>packageurl-java</artifactId>
-            <version>1.5.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli</artifactId>
-            <version>4.7.7</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.github.nscuro</groupId>
-            <artifactId>versatile-core</artifactId>
-            <version>0.12.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.github.jeremylong</groupId>
-            <artifactId>open-vulnerability-clients</artifactId>
-            <version>8.0.0</version>
+            <version>${lib.apache-httpclient5.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.19.0</version>
+            <version>${lib.jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.19.0</version>
+            <version>${lib.jackson.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.jdbi</groupId>
             <artifactId>jdbi3-core</artifactId>
-            <version>3.49.4</version>
+            <version>${lib.jdbi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jdbi</groupId>
             <artifactId>jdbi3-jackson2</artifactId>
-            <version>3.49.4</version>
+            <version>${lib.jdbi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jdbi</groupId>
             <artifactId>jdbi3-sqlite</artifactId>
-            <version>3.49.4</version>
+            <version>${lib.jdbi.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>3.49.1.0</version>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <version>${lib.jspecify.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${lib.logback.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.jeremylong</groupId>
+            <artifactId>open-vulnerability-clients</artifactId>
+            <version>${lib.open-vulnerability-clients.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.package-url</groupId>
+            <artifactId>packageurl-java</artifactId>
+            <version>${lib.packageurl-java.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${lib.picocli.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.17</version>
+            <version>${lib.slf4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>${lib.sqlite-jdbc.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.nscuro</groupId>
+            <artifactId>versatile-core</artifactId>
+            <version>${lib.versatile.version}</version>
         </dependency>
     </dependencies>
 
@@ -123,7 +139,7 @@
                         <path>
                             <groupId>info.picocli</groupId>
                             <artifactId>picocli-codegen</artifactId>
-                            <version>4.7.7</version>
+                            <version>${lib.picocli.version}</version>
                         </path>
                     </annotationProcessorPaths>
                     <source>21</source>
