@@ -1,6 +1,7 @@
 package org.dependencytrack.vulndb.store;
 
-import jakarta.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 
 public record SourceMetadataRecord(
