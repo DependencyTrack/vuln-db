@@ -218,15 +218,17 @@ zstd --decompress --rm all.sqlite.zst
 
 The full list of available artifacts can be found [here](https://github.com/DependencyTrack?tab=packages&repo_name=vuln-db).
 
-SQLite databases can be opened in any common database tool, for example [DBeaver](https://dbeaver.io/)
-or [DB Browser for SQLite](https://sqlitebrowser.org/).
-
-For more complex queries, [DuckDB](https://duckdb.org/) is worth using.  
+For exploratory queries, it's recommended to use [DuckDB](https://duckdb.org/).
 It has a [SQLite extension](https://duckdb.org/docs/extensions/sqlite.html) that is trivially enabled:
 
 ```shell
 duckdb -c 'install sqlite'
-duckdb all.sqlite
+```
+
+Recent versions ship with an [embedded browser UI](https://duckdb.org/2025/03/12/duckdb-ui.html), voiding the need for separate editors:
+
+```shell
+duckdb -ui all.sqlite
 ```
 
 ### Open questions
