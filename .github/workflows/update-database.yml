@@ -53,7 +53,6 @@ jobs:
       run: |
         docker run --rm \
           -e 'GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}' \
-          -e 'NVD_TOKEN=${{ secrets.NVD_TOKEN }}' \
           -v "$(pwd):/workspace" \
           -w '/workspace' \
           "ghcr.io/${GITHUB_REPOSITORY,,}:${{ inputs.cli-version }}" \
