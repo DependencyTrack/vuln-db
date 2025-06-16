@@ -45,7 +45,6 @@ flowchart LR
 ```shell
 docker run -it --rm \
   -e 'GITHUB_TOKEN=<your_github_token>' \
-  -e 'NVD_TOKEN=<your_nvd_token>' \
   -v "$(pwd):/workspace" \
   -w '/workspace' \
   ghcr.io/dependencytrack/vuln-db:snapshot \

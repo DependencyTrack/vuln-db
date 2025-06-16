@@ -1,5 +1,10 @@
 package org.dependencytrack.vulndb.source.nvd;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.jeremylong.openvulnerability.client.nvd.Config;
 import io.github.jeremylong.openvulnerability.client.nvd.CpeMatch;
 import io.github.jeremylong.openvulnerability.client.nvd.CveItem;
@@ -9,8 +14,6 @@ import io.github.jeremylong.openvulnerability.client.nvd.CvssV4;
 import io.github.jeremylong.openvulnerability.client.nvd.DefCveItem;
 import io.github.jeremylong.openvulnerability.client.nvd.LangString;
 import io.github.jeremylong.openvulnerability.client.nvd.Node;
-import io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient;
-import io.github.jeremylong.openvulnerability.client.nvd.NvdCveClientBuilder;
 import io.github.jeremylong.openvulnerability.client.nvd.Weakness;
 import io.github.nscuro.versatile.Vers;
 import io.github.nscuro.versatile.VersUtils;
@@ -24,15 +27,25 @@ import org.dependencytrack.vulndb.api.Vulnerability;
 import org.metaeffekt.core.security.cvss.CvssVector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import us.springett.parsers.cpe.Cpe;
 import us.springett.parsers.cpe.CpeParser;
 import us.springett.parsers.cpe.exceptions.CpeParsingException;
 import us.springett.parsers.cpe.values.Part;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,14 +53,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 
-import static io.github.jeremylong.openvulnerability.client.nvd.NvdCveClientBuilder.aNvdCveApi;
 import static java.util.Comparator.comparingInt;
 
 public final class NvdImporter implements Importer {
@@ -55,6 +65,9 @@ public final class NvdImporter implements Importer {
     private static final Logger LOGGER = LoggerFactory.getLogger(NvdImporter.class);
 
     private Database database;
+    private HttpClient httpClient;
+    private ObjectMapper objectMapper;
+    private List<Integer> feedYears;
 
     @Override
     public Source source() {
@@ -64,63 +77,103 @@ public final class NvdImporter implements Importer {
     @Override
     public void init(final Database database) {
         this.database = database;
+        this.httpClient = HttpClient.newHttpClient();
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .configure(JsonReadFeature.ALLOW_TRAILING_COMMA.mappedFeature(), true);
+        this.feedYears = IntStream.range(2002, LocalDate.now().getYear()).boxed().toList();
     }
 
     @Override
-    public void runImport() {
+    public void runImport() throws Exception {
         // https://nvd.nist.gov/developers/terms-of-use
         LOGGER.info("This product uses the NVD API but is not endorsed or certified by the NVD.");
 
-        final var vulnsImported = new AtomicInteger();
-        try (final ScheduledExecutorService statusExecutor = Executors.newSingleThreadScheduledExecutor();
-             final var apiClient = createApiClient()) {
-            statusExecutor.scheduleAtFixedRate(
-                    () -> LOGGER.info("Imported {}/{} vulnerabilities", vulnsImported, apiClient.getTotalAvailable()),
-                    1, 3, TimeUnit.SECONDS);
-
-            while (apiClient.hasNext()) {
-                final Collection<DefCveItem> defCveItems = apiClient.next();
-                final List<Vulnerability> vulns = defCveItems.stream()
-                        .map(DefCveItem::getCve)
-                        .map(cveItem -> {
-                            try (var ignored = MDC.putCloseable("vulnId", cveItem.getId())) {
-                                return convert(cveItem);
-                            }
-                        })
-                        .toList();
-                if (vulns.isEmpty()) {
-                    break;
-                }
-
-                database.storeVulnerabilities(vulns);
-                vulnsImported.addAndGet(vulns.size());
+        for (final int year : this.feedYears) {
+            LOGGER.info("Downloading feed file for year {}", year);
+            final FeedFile feedFile = downloadFeedFile(year);
+            if (feedFile == null) {
+                LOGGER.info("Download of feed file for year {} not necessary", year);
+                continue;
             }
 
-            // Unfortunately batches of CVEs are arriving out-of-order so we can only
-            // save the latest last modified timestamp at the very end.
-            database.putSourceMetadata(
-                    "last_modified_epoch_seconds",
-                    String.valueOf(apiClient.getLastUpdated().toInstant().getEpochSecond()));
+            LOGGER.info("Processing feed file for year {}", year);
+            try (final InputStream inputStream = Files.newInputStream(feedFile.path(), StandardOpenOption.DELETE_ON_CLOSE);
+                 final BufferedInputStream bufInputStream = new BufferedInputStream(inputStream);
+                 final GZIPInputStream gzipInputStream = new GZIPInputStream(bufInputStream);
+                 final JsonParser jsonParser = objectMapper.createParser(gzipInputStream)) {
+                jsonParser.nextToken(); // Position cursor at first token
+
+                JsonToken currentToken;
+                while (jsonParser.nextToken() != JsonToken.END_OBJECT) {
+                    final String fieldName = jsonParser.currentName();
+                    currentToken = jsonParser.nextToken();
+                    if ("vulnerabilities".equals(fieldName)) {
+                        if (currentToken == JsonToken.START_ARRAY) {
+                            while (jsonParser.nextToken() != JsonToken.END_ARRAY) {
+                                final var defCveItem = objectMapper.readValue(jsonParser, DefCveItem.class);
+                                final Vulnerability vuln = convert(defCveItem.getCve());
+
+                                // TODO: Batching
+                                database.storeVulnerabilities(List.of(vuln));
+                            }
+                        } else {
+                            jsonParser.skipChildren();
+                        }
+                    } else {
+                        jsonParser.skipChildren();
+                    }
+                }
+            }
+
+            database.putSourceMetadata("lastModified-" + year, String.valueOf(feedFile.lastModified().toEpochSecond()));
         }
     }
 
-    private NvdCveClient createApiClient() {
-        final NvdCveClientBuilder clientBuilder = aNvdCveApi();
+    private record FeedFile(Path path, int year, OffsetDateTime lastModified) {
+    }
 
-        final String apiToken = System.getenv("NVD_TOKEN");
-        if (apiToken != null) {
-            clientBuilder.withApiKey(apiToken);
+    private FeedFile downloadFeedFile(final int year) throws IOException, InterruptedException {
+        final var metaRequest = HttpRequest.newBuilder(
+                        URI.create("https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-%d.meta".formatted(year)))
+                .GET()
+                .build();
+        final HttpResponse<String> metaResponse = httpClient.send(metaRequest, HttpResponse.BodyHandlers.ofString());
+        if (metaResponse.statusCode() != 200) {
+            throw new IOException("Unexpected response status " + metaResponse.statusCode());
         }
 
-        Optional.ofNullable(database.getSourceMetadata().get("last_modified_epoch_seconds"))
+        final OffsetDateTime lastModified = metaResponse.body().lines()
+                .filter(line -> line.startsWith("lastModifiedDate:"))
+                .map(line -> line.split(":", 2)[1])
+                .map(OffsetDateTime::parse)
+                .findAny()
+                .orElseThrow();
+
+        final Map<String, String> sourceMetadata = database.getSourceMetadata();
+        final OffsetDateTime savedLastModified = Optional.ofNullable(sourceMetadata.get("lastModified-" + year))
                 .map(Long::parseLong)
                 .map(Instant::ofEpochSecond)
-                .map(instant -> ZonedDateTime.ofInstant(instant, ZoneOffset.UTC))
-                .ifPresent(lastModified -> clientBuilder.withLastModifiedFilter(
-                        lastModified,
-                        lastModified.plusDays(120)));
+                .map(instant -> OffsetDateTime.ofInstant(instant, ZoneOffset.UTC))
+                .orElse(null);
+        if (savedLastModified != null
+            && (savedLastModified.isBefore(lastModified) || savedLastModified.isEqual(lastModified))) {
+            return null;
+        }
 
-        return clientBuilder.build();
+        final Path filePath = Files.createTempFile(null, ".json.gz");
+
+        final var request = HttpRequest.newBuilder(
+                        URI.create("https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-%d.json.gz".formatted(year)))
+                .GET()
+                .build();
+
+        final HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(filePath));
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("Unexpected response status: " + response.statusCode());
+        }
+
+        return new FeedFile(filePath, year, lastModified);
     }
 
     private Vulnerability convert(final CveItem cveItem) {
