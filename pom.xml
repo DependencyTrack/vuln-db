@@ -16,7 +16,7 @@
         <lib.cyclonedx-core-java.version>10.2.1</lib.cyclonedx-core-java.version>
         <lib.apache-httpclient5.version>5.5</lib.apache-httpclient5.version>
         <lib.cpe-parser.version>3.0.0</lib.cpe-parser.version>
-        <lib.jackson.version>2.19.1</lib.jackson.version>
+        <lib.jackson.version>2.19.2</lib.jackson.version>
         <lib.jdbi.version>3.49.5</lib.jdbi.version>
         <lib.jspecify.version>1.0.0</lib.jspecify.version>
         <lib.logback.version>1.5.18</lib.logback.version>
