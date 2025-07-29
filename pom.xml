@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency versions -->
-        <lib.ae-security.version>0.141.0</lib.ae-security.version>
+        <lib.ae-security.version>0.141.2</lib.ae-security.version>
         <lib.cyclonedx-core-java.version>10.2.1</lib.cyclonedx-core-java.version>
         <lib.apache-httpclient5.version>5.5</lib.apache-httpclient5.version>
         <lib.cpe-parser.version>3.0.0</lib.cpe-parser.version>
