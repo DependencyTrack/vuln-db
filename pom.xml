@@ -14,7 +14,7 @@
         <!-- Dependency versions -->
         <lib.ae-security.version>0.145.0</lib.ae-security.version>
         <lib.cyclonedx-core-java.version>11.0.1</lib.cyclonedx-core-java.version>
-        <lib.apache-httpclient5.version>5.5.1</lib.apache-httpclient5.version>
+        <lib.apache-httpclient5.version>5.6</lib.apache-httpclient5.version>
         <lib.cpe-parser.version>3.0.0</lib.cpe-parser.version>
         <lib.jackson.version>2.20.0</lib.jackson.version>
         <lib.jdbi.version>3.50.0</lib.jdbi.version>
